@@ -1,17 +1,16 @@
-/* ═══════════════════════════════════════════════════════════════════════════
-   MedVault Dark v2 — Patient Churn Predictor & Retention Advisor 2
-   ═══════════════════════════════════════════════════════════════════════════ */
-
 @import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap');
+@import "tailwindcss";
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MedVault Dark Enterprise — Patient Churn Predictor & Retention Advisor
+   Dark Slate / Purple Medical Analytics Aesthetic
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
   --bg-primary: #060a13;
   --bg-secondary: #0c1220;
   --bg-tertiary: #111827;
-  --bg-card: rgba(17, 24, 39, 0.7);
-  --bg-card-hover: rgba(30, 41, 59, 0.8);
-  --bg-glass: rgba(255, 255, 255, 0.03);
-  --bg-glass-hover: rgba(255, 255, 255, 0.06);
+  --bg-card: rgba(17, 24, 39, 0.75);
   --bg-sidebar: #080d1a;
 
   --accent-primary: #8b5cf6;
@@ -32,22 +31,15 @@
   --risk-low: #10b981;
   --risk-low-bg: rgba(16, 185, 129, 0.12);
 
-  --border-subtle: rgba(255, 255, 255, 0.06);
-  --border-light: rgba(255, 255, 255, 0.1);
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --border-light: rgba(255, 255, 255, 0.12);
   --border-accent: rgba(139, 92, 246, 0.3);
-
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 20px rgba(139, 92, 246, 0.15);
 
   --radius-sm: 0.5rem;
   --radius-md: 0.75rem;
   --radius-lg: 1rem;
   --radius-xl: 1.25rem;
 
-  --transition-fast: 150ms ease;
-  --transition-normal: 250ms ease;
   --sidebar-width: 380px;
 }
 
@@ -55,11 +47,6 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-}
-
-html {
-  font-size: 16px;
-  -webkit-font-smoothing: antialiased;
 }
 
 body {
@@ -71,63 +58,28 @@ body {
   overflow-x: hidden;
 }
 
-#root {
-  min-height: 100vh;
-}
-
-::-webkit-scrollbar {
-  width: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: rgba(139, 92, 246, 0.3);
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(139, 92, 246, 0.5);
-}
-
-h1, h2, h3, h4, h5, h6 {
-  color: var(--text-primary);
-  line-height: 1.3;
-  font-weight: 600;
-}
-
 .glass-card {
-  background: var(--bg-glass);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  transition: all var(--transition-normal);
+  transition: all 250ms ease;
 }
 
 .glass-card:hover {
-  background: var(--bg-glass-hover);
   border-color: var(--border-light);
-  box-shadow: var(--shadow-glow);
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.15);
 }
 
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(18px); }
+  from { opacity: 0; transform: translateY(16px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
-}
-
-@keyframes slideInLeft {
-  from { opacity: 0; transform: translateX(-18px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes pulseGlow {
-  0%, 100% { box-shadow: 0 0 15px rgba(239, 68, 68, 0.2); }
-  50% { box-shadow: 0 0 30px rgba(239, 68, 68, 0.4); }
 }
 
 input[type="number"],
@@ -141,7 +93,7 @@ select {
   color: var(--text-primary);
   font-family: 'Inter', sans-serif;
   font-size: 0.85rem;
-  transition: all var(--transition-fast);
+  transition: all 150ms ease;
   outline: none;
 }
 

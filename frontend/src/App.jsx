@@ -1,14 +1,14 @@
 import { useState } from "react";
 import Header from "./components/Header";
 import Sidebar from "./components/Sidebar";
-import RiskCard from "./components/RiskCard";
-import GaugeChart from "./components/GaugeChart";
-import RetentionAdviceCard from "./components/RetentionAdviceCard";
-import MetricCard from "./components/MetricCard";
+import UnifiedRiskSummaryCard from "./components/UnifiedRiskSummaryCard";
+import RetentionStrategyCard from "./components/RetentionStrategyCard";
+import MetricCardRow from "./components/MetricCardRow";
 import FeatureChart from "./components/FeatureChart";
 import Interventions from "./components/Interventions";
 import BatchUpload from "./components/BatchUpload";
 import Footer from "./components/Footer";
+import ActionToast from "./components/ActionToast";
 import { predictChurn } from "./utils/api";
 import "./App.css";
 
@@ -24,6 +24,7 @@ export default function App() {
   const [prediction, setPrediction] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [toastMessage, setToastMessage] = useState(null);
 
   const handlePredict = async (formData) => {
     setLoading(true);
@@ -36,6 +37,10 @@ export default function App() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleActionTriggered = (actionName) => {
+    setToastMessage(`Outreach Action Triggered: ${actionName} logged for patient.`);
   };
 
   return (
@@ -71,7 +76,10 @@ export default function App() {
 
             <div className="tab-content">
               {activeTab === "risk" && (
-                <RiskOverviewTab prediction={prediction} />
+                <RiskOverviewTab
+                  prediction={prediction}
+                  onActionTriggered={handleActionTriggered}
+                />
               )}
               {activeTab === "analysis" && (
                 <FeatureChart
@@ -91,52 +99,34 @@ export default function App() {
 
         <Footer />
       </main>
+
+      <ActionToast
+        message={toastMessage}
+        onClose={() => setToastMessage(null)}
+      />
     </div>
   );
 }
 
-function RiskOverviewTab({ prediction }) {
+function RiskOverviewTab({ prediction, onActionTriggered }) {
   const { percentage, risk_level, primary_churn_reason, retention_advice, metrics } = prediction;
   return (
     <div className="risk-tab">
-      <div className="risk-tab-top">
-        <div className="risk-tab-left">
-          <RiskCard riskLevel={risk_level} percentage={percentage} />
-        </div>
-        <div className="risk-tab-right">
-          <GaugeChart percentage={percentage} riskLevel={risk_level} />
-        </div>
-      </div>
-
-      {/* Primary Reason & Retention Advice Hero Banner */}
-      <RetentionAdviceCard
-        primaryReason={primary_churn_reason}
-        retentionAdvice={retention_advice}
+      {/* Unified Risk Summary Card combining percentage gauge and Diagnosed Root Cause */}
+      <UnifiedRiskSummaryCard
+        percentage={percentage}
         riskLevel={risk_level}
+        primaryReason={primary_churn_reason}
       />
 
-      <div className="metrics-grid">
-        <MetricCard
-          label="Engagement Score"
-          value={metrics.engagement_score}
-          accentColor="var(--accent-primary)"
-        />
-        <MetricCard
-          label="Avg Satisfaction"
-          value={`${metrics.satisfaction_avg}/5.0`}
-          accentColor="var(--risk-medium)"
-        />
-        <MetricCard
-          label="Cost per Visit"
-          value={`$${Math.round(metrics.cost_per_visit)}`}
-          accentColor="var(--accent-cyan)"
-        />
-        <MetricCard
-          label="Visit Frequency"
-          value={`${metrics.visit_frequency}/yr`}
-          accentColor="var(--risk-low)"
-        />
-      </div>
+      {/* Interactive Actionable Retention Strategy Card with CTA outreach buttons */}
+      <RetentionStrategyCard
+        retentionAdvice={retention_advice}
+        onActionTriggered={onActionTriggered}
+      />
+
+      {/* Bottom Row of 4 Sleek Metric Cards */}
+      <MetricCardRow metrics={metrics} />
     </div>
   );
 }

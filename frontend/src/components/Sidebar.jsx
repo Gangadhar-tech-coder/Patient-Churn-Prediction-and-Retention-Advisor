@@ -49,7 +49,34 @@ export default function Sidebar({ onPredict, loading }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onPredict(form);
+
+    // Clean payload: ensure empty fields fall back to sensible numeric defaults
+    const payload = {
+      ...form,
+      age: form.age === "" ? 41 : Number(form.age),
+      tenure_months: form.tenure_months === "" ? 62 : Number(form.tenure_months),
+      referrals_made: form.referrals_made === "" ? 0 : Number(form.referrals_made),
+      visits_last_year: form.visits_last_year === "" ? 0 : Number(form.visits_last_year),
+      missed_appointments: form.missed_appointments === "" ? 0 : Number(form.missed_appointments),
+      days_since_last_visit: form.days_since_last_visit === "" ? 90 : Number(form.days_since_last_visit),
+      avg_out_of_pocket_cost: form.avg_out_of_pocket_cost === "" ? 300 : Number(form.avg_out_of_pocket_cost),
+      distance_to_facility: form.distance_to_facility === "" ? 10 : Number(form.distance_to_facility),
+      overall_satisfaction: Number(form.overall_satisfaction),
+      wait_time_satisfaction: Number(form.wait_time_satisfaction),
+      staff_satisfaction: Number(form.staff_satisfaction),
+      provider_rating: Number(form.provider_rating),
+    };
+
+    onPredict(payload);
+  };
+
+  const handleNumChange = (field, val, parser = parseInt) => {
+    if (val === "") {
+      update(field, "");
+    } else {
+      const parsed = parser(val);
+      update(field, isNaN(parsed) ? "" : parsed);
+    }
   };
 
   return (
@@ -79,7 +106,7 @@ export default function Sidebar({ onPredict, loading }) {
                 min={18}
                 max={90}
                 value={form.age}
-                onChange={(e) => update("age", parseInt(e.target.value) || 18)}
+                onChange={(e) => handleNumChange("age", e.target.value)}
               />
             </div>
             <div className="form-group">
@@ -147,9 +174,7 @@ export default function Sidebar({ onPredict, loading }) {
                 min={1}
                 max={120}
                 value={form.tenure_months}
-                onChange={(e) =>
-                  update("tenure_months", parseInt(e.target.value) || 1)
-                }
+                onChange={(e) => handleNumChange("tenure_months", e.target.value)}
               />
             </div>
             <div className="form-group">
@@ -160,9 +185,7 @@ export default function Sidebar({ onPredict, loading }) {
                 min={0}
                 max={5}
                 value={form.referrals_made}
-                onChange={(e) =>
-                  update("referrals_made", parseInt(e.target.value) || 0)
-                }
+                onChange={(e) => handleNumChange("referrals_made", e.target.value)}
               />
             </div>
           </div>
@@ -183,9 +206,7 @@ export default function Sidebar({ onPredict, loading }) {
                 min={0}
                 max={20}
                 value={form.visits_last_year}
-                onChange={(e) =>
-                  update("visits_last_year", parseInt(e.target.value) || 0)
-                }
+                onChange={(e) => handleNumChange("visits_last_year", e.target.value)}
               />
             </div>
             <div className="form-group">
@@ -196,16 +217,14 @@ export default function Sidebar({ onPredict, loading }) {
                 min={0}
                 max={10}
                 value={form.missed_appointments}
-                onChange={(e) =>
-                  update("missed_appointments", parseInt(e.target.value) || 0)
-                }
+                onChange={(e) => handleNumChange("missed_appointments", e.target.value)}
               />
             </div>
           </div>
           <div className="form-group">
             <label htmlFor="days-since">
               Days Since Last Visit:{" "}
-              <span className="slider-value">{form.days_since_last_visit}</span>
+              <span className="slider-value">{form.days_since_last_visit || 0}</span>
             </label>
             <input
               id="days-since"
@@ -213,9 +232,7 @@ export default function Sidebar({ onPredict, loading }) {
               min={1}
               max={730}
               value={form.days_since_last_visit}
-              onChange={(e) =>
-                update("days_since_last_visit", parseInt(e.target.value))
-              }
+              onChange={(e) => handleNumChange("days_since_last_visit", e.target.value)}
             />
           </div>
           <div className="form-group">
@@ -242,7 +259,7 @@ export default function Sidebar({ onPredict, loading }) {
           <SliderField
             id="overall-sat"
             label="Overall Satisfaction"
-            value={form.overall_satisfaction}
+            value={Number(form.overall_satisfaction) || 1}
             min={1}
             max={5}
             step={0.1}
@@ -251,7 +268,7 @@ export default function Sidebar({ onPredict, loading }) {
           <SliderField
             id="wait-sat"
             label="Wait Time Satisfaction"
-            value={form.wait_time_satisfaction}
+            value={Number(form.wait_time_satisfaction) || 1}
             min={1}
             max={5}
             step={0.1}
@@ -260,7 +277,7 @@ export default function Sidebar({ onPredict, loading }) {
           <SliderField
             id="staff-sat"
             label="Staff Satisfaction"
-            value={form.staff_satisfaction}
+            value={Number(form.staff_satisfaction) || 1}
             min={1}
             max={5}
             step={0.1}
@@ -269,7 +286,7 @@ export default function Sidebar({ onPredict, loading }) {
           <SliderField
             id="provider-rating"
             label="Provider Rating"
-            value={form.provider_rating}
+            value={Number(form.provider_rating) || 1}
             min={1}
             max={5}
             step={0.1}
@@ -291,16 +308,14 @@ export default function Sidebar({ onPredict, loading }) {
               min={20}
               max={2000}
               value={form.avg_out_of_pocket_cost}
-              onChange={(e) =>
-                update("avg_out_of_pocket_cost", parseInt(e.target.value) || 20)
-              }
+              onChange={(e) => handleNumChange("avg_out_of_pocket_cost", e.target.value)}
             />
           </div>
           <div className="form-group">
             <label htmlFor="distance">
               Distance to Facility:{" "}
               <span className="slider-value">
-                {form.distance_to_facility} mi
+                {form.distance_to_facility || 0} mi
               </span>
             </label>
             <input
@@ -310,9 +325,7 @@ export default function Sidebar({ onPredict, loading }) {
               max={50}
               step={0.5}
               value={form.distance_to_facility}
-              onChange={(e) =>
-                update("distance_to_facility", parseFloat(e.target.value))
-              }
+              onChange={(e) => handleNumChange("distance_to_facility", e.target.value, parseFloat)}
             />
           </div>
           <div className="form-group">

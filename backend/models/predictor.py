@@ -102,7 +102,6 @@ class ChurnPredictor:
         if probability < 0.45:
             reason = "Not currently at risk (satisfied / engaged patient)"
         else:
-            # Check rule-based signals first for direct alignment
             if patient.missed_appointments >= 3:
                 reason = "Frequently missed appointments (disengagement)"
             elif patient.billing_issues == 1:
@@ -126,7 +125,6 @@ class ChurnPredictor:
             elif patient.portal_usage == 0:
                 reason = "Low patient portal / digital engagement"
             else:
-                # Use ML model prediction if rule thresholds aren't breached
                 pred_idx = self.reason_model.predict(df_input)[0]
                 reason = str(self.reason_encoder.inverse_transform([pred_idx])[0])
 
@@ -135,6 +133,86 @@ class ChurnPredictor:
             "Continue standard engagement: routine check-in reminders and periodic satisfaction surveys.",
         )
         return reason, advice
+
+    def predict_batch(self, df_raw: pd.DataFrame) -> List[Dict]:
+        """Fast vectorized batch prediction for entire cohort at once."""
+        df = df_raw.copy()
+
+        df["Engagement_Score"] = df["Visits_Last_Year"] - df["Missed_Appointments"]
+        df["Cost_Per_Visit"] = df["Avg_Out_Of_Pocket_Cost"] / (df["Visits_Last_Year"] + 1)
+        df["Satisfaction_Avg"] = (
+            df["Overall_Satisfaction"]
+            + df["Wait_Time_Satisfaction"]
+            + df["Staff_Satisfaction"]
+        ) / 3
+
+        feature_cols = [
+            "Age", "Tenure_Months", "Visits_Last_Year", "Missed_Appointments",
+            "Days_Since_Last_Visit", "Overall_Satisfaction", "Wait_Time_Satisfaction",
+            "Staff_Satisfaction", "Provider_Rating", "Avg_Out_Of_Pocket_Cost",
+            "Billing_Issues", "Portal_Usage", "Referrals_Made",
+            "Distance_To_Facility_Miles", "Engagement_Score", "Cost_Per_Visit",
+            "Satisfaction_Avg", "Gender", "State", "Specialty", "Insurance_Type"
+        ]
+
+        X_encoded = pd.get_dummies(df[feature_cols]).reindex(columns=self.columns, fill_value=0)
+
+        probabilities = self.churn_model.predict_proba(X_encoded)[:, 1]
+        reason_preds = self.reason_model.predict(X_encoded)
+        reason_labels = self.reason_encoder.inverse_transform(reason_preds)
+
+        results = []
+        for idx, (_, row) in enumerate(df.iterrows()):
+            prob = float(probabilities[idx])
+            pct = round(prob * 100, 1)
+            risk_level, _ = self._classify_risk(prob)
+
+            if prob < 0.45:
+                reason = "Not currently at risk (satisfied / engaged patient)"
+            else:
+                if row.get("Missed_Appointments", 0) >= 3:
+                    reason = "Frequently missed appointments (disengagement)"
+                elif row.get("Billing_Issues", 0) == 1:
+                    reason = "Unresolved billing issues"
+                elif row.get("Avg_Out_Of_Pocket_Cost", 0) >= 1200:
+                    reason = "High out-of-pocket cost burden"
+                elif row.get("Wait_Time_Satisfaction", 5) <= 2.2:
+                    reason = "Long appointment wait times"
+                elif row.get("Overall_Satisfaction", 5) <= 2.2:
+                    reason = "Low overall satisfaction with care"
+                elif row.get("Staff_Satisfaction", 5) <= 2.2:
+                    reason = "Poor front-desk / staff experience"
+                elif row.get("Provider_Rating", 5) <= 2.5:
+                    reason = "Low provider rating"
+                elif row.get("Distance_To_Facility_Miles", 0) >= 30.0:
+                    reason = "Facility located too far from patient"
+                elif row.get("Days_Since_Last_Visit", 0) >= 250:
+                    reason = "Long gap since last visit (lapsed patient)"
+                elif row.get("Visits_Last_Year", 0) <= 1:
+                    reason = "Low overall visit frequency"
+                elif row.get("Portal_Usage", 1) == 0:
+                    reason = "Low patient portal / digital engagement"
+                else:
+                    reason = str(reason_labels[idx])
+
+            advice = self.advice_map.get(
+                reason,
+                "Continue standard engagement: routine check-in reminders and periodic satisfaction surveys.",
+            )
+
+            patient_id = str(row["PatientID"]) if "PatientID" in row else f"P-{idx+1}"
+
+            results.append({
+                "index": idx,
+                "patient_id": patient_id,
+                "probability": round(prob, 4),
+                "percentage": pct,
+                "risk_level": risk_level,
+                "primary_churn_reason": reason,
+                "retention_advice": advice,
+            })
+
+        return results
 
     @staticmethod
     def compute_feature_contributions(patient: PatientInput) -> List[FeatureContribution]:

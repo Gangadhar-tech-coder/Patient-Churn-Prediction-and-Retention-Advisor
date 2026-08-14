@@ -74,41 +74,21 @@ async def batch_predict(file: UploadFile = File(...)):
         "Billing_Issues": "billing_issues",
     }
 
+    batch_results = predictor.predict_batch(df)
+
     results = []
     high = medium = low = 0
 
-    for idx, row in df.iterrows():
-        try:
-            patient_id = str(row["PatientID"]) if "PatientID" in row else f"P-{idx+1}"
-            patient_data = {}
-            for csv_col, schema_field in column_map.items():
-                if csv_col in row:
-                    patient_data[schema_field] = row[csv_col]
+    for item in batch_results:
+        risk = item["risk_level"]
+        if risk == "High":
+            high += 1
+        elif risk == "Medium":
+            medium += 1
+        else:
+            low += 1
 
-            patient = PatientInput(**patient_data)
-            pred = predictor.predict(patient)
-            risk = pred["risk_level"]
-
-            if risk == "High":
-                high += 1
-            elif risk == "Medium":
-                medium += 1
-            else:
-                low += 1
-
-            results.append(
-                BatchPredictionRow(
-                    index=int(idx),
-                    patient_id=patient_id,
-                    probability=pred["probability"],
-                    percentage=pred["percentage"],
-                    risk_level=risk,
-                    primary_churn_reason=pred["primary_churn_reason"],
-                    retention_advice=pred["retention_advice"],
-                )
-            )
-        except Exception:
-            continue
+        results.append(BatchPredictionRow(**item))
 
     return BatchPredictionResponse(
         total=len(results),

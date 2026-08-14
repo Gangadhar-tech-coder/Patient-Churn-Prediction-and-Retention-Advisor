@@ -2,7 +2,7 @@
  * API Client Utility for Patient Churn Predictor & Retention Advisor 2
  */
 
-const API_BASE = "http://localhost:8000/api";
+const API_BASE = "https://patient-churn-prediction-and-retention.onrender.com/api";
 
 export async function predictChurn(patientData) {
   const response = await fetch(`${API_BASE}/predict`, {

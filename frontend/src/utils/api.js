@@ -1,7 +1,7 @@
 /**
- * API Client Utility for Patient Churn Predictor & Retention Advisor 2
- * Smart Dual-URL configuration: Tries local backend first (50ms fast response),
- * falls back to Render cloud deployment.
+ * API Client Utility for Patient Churn Predictor & Retention Advisor
+ * Smart Dual-URL configuration: Tries local backend first (1.5s timeout),
+ * falls back to cloud deployment.
  */
 
 const LOCAL_API = "http://localhost:8000/api";
@@ -12,7 +12,6 @@ let activeApiBase = null;
 async function getApiBase() {
   if (activeApiBase) return activeApiBase;
 
-  // Quick 1.5s timeout check for fast local server
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 1500);
@@ -23,32 +22,11 @@ async function getApiBase() {
       return LOCAL_API;
     }
   } catch (e) {
-    // Local server not running, fall back to cloud deployment
+    // Local server not running, fall back to cloud
   }
 
   activeApiBase = CLOUD_API;
   return CLOUD_API;
-}
-
-export async function predictChurn(patientData) {
-  const base = await getApiBase();
-  const response = await fetch(`${base}/predict`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(patientData),
-  });
-
-  // If local failed unexpectedly, switch to cloud
-  if (!response.ok && base === LOCAL_API) {
-    activeApiBase = CLOUD_API;
-    return predictChurn(patientData);
-  }
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.detail || "Prediction failed");
-  }
-  return response.json();
 }
 
 export async function batchPredict(file) {

@@ -1,9 +1,9 @@
 """
-ML Model Training Script — Patient Churn & Retention Advisor (Gradient Boosting Branch)
-========================================================================================
+ML Model Training Script — Patient Churn & Retention Advisor (RandomForest)
+===========================================================================
 Trains:
-1. Binary Churn Classifier (Gradient Boosting) for churn probability %
-2. Multi-class Churn Reason Classifier (Gradient Boosting) for primary churn reason
+1. Binary Churn Classifier (RandomForest) for churn probability %
+2. Multi-class Churn Reason Classifier (RandomForest) for primary churn reason
 3. Retention Advice Map (maps each churn reason to actionable retention advice)
 
 Saves artifacts to backend/ml_model/
@@ -14,7 +14,7 @@ import joblib
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import classification_report, roc_auc_score
 
@@ -91,22 +91,22 @@ def train():
         )
     )
 
-    print("[3/4] Training Churn Probability Model (GradientBoosting)...")
-    churn_model = GradientBoostingClassifier(
-        n_estimators=200, learning_rate=0.05, max_depth=5, random_state=42
+    print("[3/4] Training Churn Probability Model (RandomForest)...")
+    churn_model = RandomForestClassifier(
+        n_estimators=200, max_depth=10, random_state=42, n_jobs=-1
     )
     churn_model.fit(X_train, y_churn_train)
     churn_probs = churn_model.predict_proba(X_test)[:, 1]
     auc = roc_auc_score(y_churn_test, churn_probs)
     print(f"   -> Binary Churn Model ROC-AUC: {auc:.4f}")
 
-    print("[4/4] Training Churn Reason Classifier (GradientBoosting)...")
+    print("[4/4] Training Churn Reason Classifier (RandomForest)...")
     reason_encoder = LabelEncoder()
     y_reason_encoded_train = reason_encoder.fit_transform(y_reason_train)
     y_reason_encoded_test = reason_encoder.transform(y_reason_test)
 
-    reason_model = GradientBoostingClassifier(
-        n_estimators=200, learning_rate=0.05, max_depth=6, random_state=42
+    reason_model = RandomForestClassifier(
+        n_estimators=200, max_depth=12, random_state=42, n_jobs=-1
     )
     reason_model.fit(X_train, y_reason_encoded_train)
     reason_acc = reason_model.score(X_test, y_reason_encoded_test)
@@ -122,7 +122,7 @@ def train():
     joblib.dump(reason_encoder, os.path.join(ml_model_dir, "reason_encoder.pkl"))
     joblib.dump(advice_map, os.path.join(ml_model_dir, "advice_map.pkl"))
 
-    print(f"\n[OK] All Gradient Boosting artifacts successfully saved to: {ml_model_dir}")
+    print(f"\n[OK] All RandomForest artifacts successfully saved to: {ml_model_dir}")
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 """
-Pydantic Schemas for Patient Churn Predictor & Retention Advisor 2
+Pydantic Schemas for Patient Churn Predictor & Retention Advisor
 """
 
 from pydantic import BaseModel, Field
@@ -51,6 +51,14 @@ class PatientInput(BaseModel):
     )
 
 
+class Driver(BaseModel):
+    """Single SHAP driver with retention advice."""
+
+    feature: str
+    shap_value: float
+    advice: Optional[dict] = None
+
+
 class FeatureContribution(BaseModel):
     """Risk impact score per factor."""
 
@@ -76,14 +84,13 @@ class EngineeredMetrics(BaseModel):
 
 
 class PredictionResponse(BaseModel):
-    """Prediction output containing churn probability %, primary churn reason, and retention advice."""
+    """Single patient prediction output."""
 
     probability: float
     percentage: float
     risk_level: str
     risk_class: str
-    primary_churn_reason: str
-    retention_advice: str
+    drivers: List[Driver]
     metrics: EngineeredMetrics
     feature_contributions: List[FeatureContribution]
     interventions: List[Intervention]
@@ -97,8 +104,7 @@ class BatchPredictionRow(BaseModel):
     probability: float
     percentage: float
     risk_level: str
-    primary_churn_reason: str
-    retention_advice: str
+    drivers: List[Driver]
 
 
 class BatchPredictionResponse(BaseModel):
@@ -109,6 +115,9 @@ class BatchPredictionResponse(BaseModel):
     medium_risk: int
     low_risk: int
     results: List[BatchPredictionRow]
+    warnings: List[str] = []
+    sampled: bool = False
+    sample_size: Optional[int] = None
 
 
 class HealthResponse(BaseModel):

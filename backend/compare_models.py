@@ -1,61 +1,63 @@
 """
 Model Comparison & Accuracy Benchmark Script — Patient Churn Predictor
 =======================================================================
-Compares Random Forest performance against multiple alternative ML models:
-1. Random Forest Classifier (Current Model)
-2. Gradient Boosting Classifier
-3. Extra Trees Classifier
-4. Decision Tree Classifier
-5. Logistic Regression
-6. K-Nearest Neighbors (KNN)
-7. Gaussian Naive Bayes
-8. Support Vector Classifier (SVC)
+Compares exactly 3 gradient-boosting models that support native categoricals + NaN:
+1. HistGradientBoostingClassifier (sklearn)
+2. XGBClassifier (xgboost)
+3. LGBMClassifier (lightgbm)
 
-Evaluates: ROC-AUC, Accuracy, Precision, Recall, F1-Score, and Execution Latency.
+Evaluates: 5-fold StratifiedKFold CV AUC + held-out test AUC.
+Winner = max(mean_cv_auc), ties broken by held-out AUC.
+Results saved to data/model_comparison_benchmark.csv.
 """
 
 import os
 import time
+import warnings
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import (
-    accuracy_score,
-    roc_auc_score,
-    precision_score,
-    recall_score,
-    f1_score,
-)
+from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score
+from sklearn.metrics import roc_auc_score
+from sklearn.ensemble import HistGradientBoostingClassifier
 
-# ML Model Algorithms
-from sklearn.ensemble import (
-    RandomForestClassifier,
-    GradientBoostingClassifier,
-    ExtraTreesClassifier,
-)
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.naive_bayes import GaussianNB
-from sklearn.svm import SVC
-from sklearn.preprocessing import StandardScaler
+try:
+    from xgboost import XGBClassifier
+    HAS_XGB = True
+except ImportError:
+    HAS_XGB = False
+    warnings.warn("xgboost not installed — skipping XGBClassifier in benchmark")
+
+try:
+    from lightgbm import LGBMClassifier
+    HAS_LGBM = True
+except ImportError:
+    HAS_LGBM = False
+    warnings.warn("lightgbm not installed — skipping LGBMClassifier in benchmark")
 
 
-def run_comparison():
+CATEGORICAL_COLS = ["Gender", "State", "Specialty", "Insurance_Type"]
+
+FEATURE_COLS = [
+    "Age", "Tenure_Months", "Visits_Last_Year", "Missed_Appointments",
+    "Days_Since_Last_Visit", "Overall_Satisfaction", "Wait_Time_Satisfaction",
+    "Staff_Satisfaction", "Provider_Rating", "Avg_Out_Of_Pocket_Cost",
+    "Billing_Issues", "Portal_Usage", "Referrals_Made", "Distance_To_Facility_Miles",
+    "Engagement_Score", "Cost_Per_Visit", "Satisfaction_Avg",
+    "Gender", "State", "Specialty", "Insurance_Type",
+]
+
+
+def prepare_data():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     data_path = os.path.join(
         os.path.dirname(base_dir), "data", "patient_churn_dataset_enriched.csv"
     )
 
-    print("=" * 80)
-    print("PATIENT CHURN PREDICTION — MULTI-MODEL ACCURACY & PERFORMANCE BENCHMARK")
-    print("=" * 80)
-
     print(f"\n[1] Loading dataset from: {data_path}")
     df = pd.read_csv(data_path)
     print(f"    Dataset Shape: {df.shape[0]} rows, {df.shape[1]} columns")
 
-    # Feature Engineering (Same as train_model.py)
+    # Feature Engineering
     df["Engagement_Score"] = df["Visits_Last_Year"] - df["Missed_Appointments"]
     df["Cost_Per_Visit"] = df["Avg_Out_Of_Pocket_Cost"] / (df["Visits_Last_Year"] + 1)
     df["Satisfaction_Avg"] = (
@@ -64,143 +66,93 @@ def run_comparison():
         + df["Staff_Satisfaction"]
     ) / 3
 
-    feature_cols = [
-        "Age",
-        "Tenure_Months",
-        "Visits_Last_Year",
-        "Missed_Appointments",
-        "Days_Since_Last_Visit",
-        "Overall_Satisfaction",
-        "Wait_Time_Satisfaction",
-        "Staff_Satisfaction",
-        "Provider_Rating",
-        "Avg_Out_Of_Pocket_Cost",
-        "Billing_Issues",
-        "Portal_Usage",
-        "Referrals_Made",
-        "Distance_To_Facility_Miles",
-        "Engagement_Score",
-        "Cost_Per_Visit",
-        "Satisfaction_Avg",
-        "Gender",
-        "State",
-        "Specialty",
-        "Insurance_Type",
-    ]
-
-    X_raw = df[feature_cols]
+    X_raw = df[FEATURE_COLS].copy()
     y = df["Churned"]
 
-    # One-Hot Encoding
-    X_encoded = pd.get_dummies(X_raw)
+    # Cast object columns to pandas category dtype — no one-hot encoding
+    # Replace NaN with sentinel so model learns to handle missing categoricals
+    for col in CATEGORICAL_COLS:
+        X_raw[col] = X_raw[col].fillna("__MISSING__").astype("category")
 
-    # Train/Test Split (80% Train, 20% Test)
+    return X_raw, y
+
+
+def run_comparison():
+    X_raw, y = prepare_data()
+
+    # Single identical split for all models
     X_train, X_test, y_train, y_test = train_test_split(
-        X_encoded, y, test_size=0.2, random_state=42, stratify=y
+        X_raw, y, test_size=0.2, random_state=42, stratify=y
     )
-
-    # Scale data for distance-sensitive models (Logistic Regression, KNN, SVC)
-    scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_test_scaled = scaler.transform(X_test)
 
     print(f"    Train size: {len(X_train)} samples  |  Test size: {len(X_test)} samples\n")
 
-    # Define Candidate Models
+    # Build candidate model dict — only include installed libs
     models = {
-        "Random Forest (Current)": (
-            RandomForestClassifier(
-                n_estimators=300, max_depth=12, min_samples_split=4, random_state=42
-            ),
-            False,
-        ),
-        "Gradient Boosting": (
-            GradientBoostingClassifier(
-                n_estimators=200, learning_rate=0.05, max_depth=5, random_state=42
-            ),
-            False,
-        ),
-        "Extra Trees": (
-            ExtraTreesClassifier(n_estimators=300, max_depth=12, random_state=42),
-            False,
-        ),
-        "Decision Tree": (
-            DecisionTreeClassifier(max_depth=8, random_state=42),
-            False,
-        ),
-        "Logistic Regression": (
-            LogisticRegression(max_iter=1000, random_state=42),
-            True,
-        ),
-        "K-Nearest Neighbors (KNN)": (
-            KNeighborsClassifier(n_neighbors=7),
-            True,
-        ),
-        "Gaussian Naive Bayes": (
-            GaussianNB(),
-            False,
-        ),
-        "Support Vector Machine (SVC)": (
-            SVC(probability=True, random_state=42),
-            True,
+        "HistGradientBoosting": HistGradientBoostingClassifier(
+            max_iter=300, learning_rate=0.05, max_depth=6, random_state=42,
         ),
     }
+    if HAS_XGB:
+        models["XGBoost"] = XGBClassifier(
+            n_estimators=300, learning_rate=0.05, max_depth=6, random_state=42,
+            enable_categorical=True, tree_method="hist",
+            eval_metric="auc",
+        )
+    if HAS_LGBM:
+        models["LightGBM"] = LGBMClassifier(
+            n_estimators=300, learning_rate=0.05, max_depth=6, random_state=42,
+            verbose=-1,
+        )
 
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
     results = []
 
-    print("-" * 80)
-    print(f"{'Model Name':<28} | {'ROC-AUC':<8} | {'Accuracy':<8} | {'Precision':<9} | {'Recall':<6} | {'F1-Score':<8} | {'Time (ms)':<9}")
+    print("=" * 80)
+    print("PATIENT CHURN PREDICTION — 3-MODEL GRADIENT BOOSTING BENCHMARK")
+    print("=" * 80)
+    print(f"\n{'Model':<25} | {'Mean CV AUC':<12} | {'Test AUC':<10} | {'Latency (ms)':<12}")
     print("-" * 80)
 
-    for name, (model, requires_scaling) in models.items():
-        X_tr = X_train_scaled if requires_scaling else X_train
-        X_te = X_test_scaled if requires_scaling else X_test
+    for name, model in models.items():
+        # 5-fold Stratified CV AUC
+        cv_scores = cross_val_score(model, X_train, y_train, cv=cv, scoring="roc_auc")
+        mean_cv_auc = cv_scores.mean()
 
-        # Measure training & inference latency
+        # Train on full train set, score on held-out test
         t0 = time.time()
-        model.fit(X_tr, y_train)
-        
-        # Predictions
-        y_pred = model.predict(X_te)
-        if hasattr(model, "predict_proba"):
-            y_prob = model.predict_proba(X_te)[:, 1]
-        else:
-            y_prob = model.decision_function(X_te)
-
-        t1 = time.time()
-        latency_ms = (t1 - t0) * 1000
-
-        # Calculate Evaluation Metrics
-        acc = accuracy_score(y_test, y_pred)
-        auc = roc_auc_score(y_test, y_prob)
-        prec = precision_score(y_test, y_pred, zero_division=0)
-        rec = recall_score(y_test, y_pred, zero_division=0)
-        f1 = f1_score(y_test, y_pred, zero_division=0)
+        model.fit(X_train, y_train)
+        y_prob = model.predict_proba(X_test)[:, 1]
+        test_auc = roc_auc_score(y_test, y_prob)
+        latency_ms = (time.time() - t0) * 1000
 
         results.append({
             "Model": name,
-            "ROC-AUC": round(auc, 4),
-            "Accuracy": round(acc, 4),
-            "Precision": round(prec, 4),
-            "Recall": round(rec, 4),
-            "F1-Score": round(f1, 4),
-            "Latency (ms)": round(latency_ms, 2),
+            "Mean_CV_AUC": round(mean_cv_auc, 4),
+            "Test_AUC": round(test_auc, 4),
+            "Latency_ms": round(latency_ms, 2),
         })
-
-        print(f"{name:<28} | {auc:<8.4f} | {acc:<8.4f} | {prec:<9.4f} | {rec:<6.4f} | {f1:<8.4f} | {latency_ms:<9.2f}")
+        print(f"{name:<25} | {mean_cv_auc:<12.4f} | {test_auc:<10.4f} | {latency_ms:<12.2f}")
 
     print("-" * 80)
 
-    # Convert to DataFrame & Sort by ROC-AUC
-    results_df = pd.DataFrame(results).sort_values(by="ROC-AUC", ascending=False)
-    
+    # Pick winner: max(mean_cv_auc), ties broken by test_auc
+    results_df = pd.DataFrame(results).sort_values(
+        by=["Mean_CV_AUC", "Test_AUC"], ascending=[False, False]
+    )
+    winner = results_df.iloc[0]
+
+    # Save benchmark table
+    base_dir = os.path.dirname(os.path.abspath(__file__))
     output_csv = os.path.join(os.path.dirname(base_dir), "data", "model_comparison_benchmark.csv")
     results_df.to_csv(output_csv, index=False)
 
-    print(f"\n[OK] Benchmark completed successfully! Results saved to:\n     {output_csv}\n")
-    print("TOP PERFORMING MODEL BY ROC-AUC:")
-    top_model = results_df.iloc[0]
-    print(f"[TOP MODEL] {top_model['Model']} - ROC-AUC: {top_model['ROC-AUC']:.4f} | Accuracy: {top_model['Accuracy']*100:.2f}%\n")
+    print(f"\n[OK] Benchmark completed. Results saved to: {output_csv}")
+    print(f"\n  WINNER: {winner['Model']}")
+    print(f"    CV AUC:   {winner['Mean_CV_AUC']:.4f}")
+    print(f"    Test AUC: {winner['Test_AUC']:.4f}")
+
+    return winner, results_df
 
 
 if __name__ == "__main__":

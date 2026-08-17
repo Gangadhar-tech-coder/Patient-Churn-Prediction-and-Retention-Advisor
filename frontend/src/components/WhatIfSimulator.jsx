@@ -11,12 +11,24 @@ const SLIDERS = [
 ];
 
 const BASE_PATIENT = {
-  age: 50, gender: "Female", state: "CA", specialty: "General Practice",
-  insurance_type: "Private", tenure_months: 36, referrals_made: 1,
-  visits_last_year: 3, missed_appointments: 0, days_since_last_visit: 90,
-  portal_usage: 1, overall_satisfaction: 3.5, wait_time_satisfaction: 3.5,
-  staff_satisfaction: 3.5, provider_rating: 3.5, avg_out_of_pocket_cost: 400,
-  distance_to_facility: 10, billing_issues: 0,
+  age: 50,
+  gender: "Female",
+  state: "CA",
+  specialty: "General Practice",
+  insurance_type: "Private",
+  tenure_months: 36,
+  referrals_made: 1,
+  visits_last_year: 3,
+  missed_appointments: 0,
+  days_since_last_visit: 90,
+  portal_usage: 1,
+  overall_satisfaction: 3.5,
+  wait_time_satisfaction: 3.5,
+  staff_satisfaction: 3.5,
+  provider_rating: 3.5,
+  avg_out_of_pocket_cost: 400,
+  distance_to_facility: 10,
+  billing_issues: 0,
 };
 
 export default function WhatIfSimulator() {
@@ -49,10 +61,9 @@ export default function WhatIfSimulator() {
   return (
     <div className="whatif-card">
       <div className="whatif-header">
-        <span className="whatif-icon">🔬</span>
         <div>
           <h3>What-If Risk Simulator</h3>
-          <p>Adjust parameters to see how they affect churn risk in real-time</p>
+          <p>Adjust parameters to see how interventions affect churn risk in real-time</p>
         </div>
       </div>
 
@@ -67,17 +78,21 @@ export default function WhatIfSimulator() {
                 </span>
               </div>
               <input
-                type="range" min={s.min} max={s.max} step={s.step}
+                type="range"
+                min={s.min}
+                max={s.max}
+                step={s.step}
                 value={values[s.key]}
                 onChange={(e) => handleChange(s.key, e.target.value)}
               />
               <div className="whatif-range">
-                <span>{s.min}</span><span>{s.max}</span>
+                <span>{s.min}</span>
+                <span>{s.max}</span>
               </div>
             </div>
           ))}
           <button className="whatif-btn" onClick={handleSimulate} disabled={loading}>
-            {loading ? "Simulating..." : "⚡ Run Simulation"}
+            {loading ? "Simulating..." : "Run Simulation"}
           </button>
         </div>
 
@@ -92,8 +107,7 @@ export default function WhatIfSimulator() {
             </>
           ) : (
             <div className="whatif-placeholder">
-              <span>🎯</span>
-              <p>Adjust the sliders and click <strong>Run Simulation</strong> to see predicted churn risk</p>
+              <p>Adjust the sliders and click <strong>Run Simulation</strong> to compute churn risk</p>
             </div>
           )}
         </div>

@@ -1,16 +1,31 @@
 import { useState } from "react";
-import { AuthProvider } from "./context/AuthContext";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 import Header from "./components/Header";
 import Sidebar from "./components/Sidebar";
 import HomeView from "./views/HomeView";
 import RetentionAdvisorView from "./views/RetentionAdvisorView";
-import ReportsView from "./views/ReportsView";
 import CohortAnalysisView from "./views/CohortAnalysisView";
 import UserAnalyticsView from "./views/UserAnalyticsView";
+import LoginPage from "./views/LoginPage";
 import "./App.css";
 
 function AppContent() {
+  const { user, loading } = useAuth();
   const [activeView, setActiveView] = useState("home");
+
+  if (loading) {
+    return (
+      <div className="app-loading-screen">
+        <div className="loading-spinner"></div>
+        <p>Loading Patient Churn Prediction...</p>
+      </div>
+    );
+  }
+
+  // Force login page every time if user is not logged in
+  if (!user) {
+    return <LoginPage />;
+  }
 
   const renderView = () => {
     switch (activeView) {
@@ -20,8 +35,6 @@ function AppContent() {
         return <RetentionAdvisorView />;
       case "cohort":
         return <CohortAnalysisView />;
-      case "reports":
-        return <ReportsView />;
       case "analytics":
         return <UserAnalyticsView />;
       default:
@@ -34,9 +47,7 @@ function AppContent() {
       <Sidebar activeView={activeView} onNavigate={setActiveView} />
       <main className="main-content">
         <Header />
-        <div className="main-scroll">
-          {renderView()}
-        </div>
+        <div className="main-scroll">{renderView()}</div>
       </main>
     </div>
   );

@@ -237,7 +237,7 @@ class ChurnPredictor:
         if patient.days_since_last_visit > 180:
             items.append(
                 Intervention(
-                    icon="📞",
+                    icon="Outreach",
                     text="Schedule proactive outreach call",
                     priority="high",
                 )
@@ -245,13 +245,13 @@ class ChurnPredictor:
         if patient.overall_satisfaction < 2.5:
             items.append(
                 Intervention(
-                    icon="🎧", text="Assign patient advocate", priority="high"
+                    icon="Advocate", text="Assign patient advocate", priority="high"
                 )
             )
         if patient.billing_issues == 1:
             items.append(
                 Intervention(
-                    icon="💰",
+                    icon="Counseling",
                     text="Connect with financial counseling",
                     priority="high",
                 )
@@ -259,13 +259,13 @@ class ChurnPredictor:
         if patient.missed_appointments > 3:
             items.append(
                 Intervention(
-                    icon="📱", text="Offer telehealth options", priority="high"
+                    icon="Telehealth", text="Offer telehealth options", priority="high"
                 )
             )
         if patient.portal_usage == 0:
             items.append(
                 Intervention(
-                    icon="🖥️",
+                    icon="Portal",
                     text="Promote patient portal enrollment",
                     priority="medium",
                 )
@@ -273,7 +273,7 @@ class ChurnPredictor:
         if patient.distance_to_facility > 25:
             items.append(
                 Intervention(
-                    icon="🚗",
+                    icon="Location",
                     text="Suggest closer satellite facility",
                     priority="medium",
                 )
@@ -281,7 +281,7 @@ class ChurnPredictor:
         if patient.visits_last_year < 2:
             items.append(
                 Intervention(
-                    icon="📅",
+                    icon="Reminders",
                     text="Send preventive care reminders",
                     priority="medium",
                 )
@@ -289,7 +289,7 @@ class ChurnPredictor:
         if not items:
             items.append(
                 Intervention(
-                    icon="✅",
+                    icon="Standard",
                     text="Continue standard engagement protocols",
                     priority="low",
                 )

@@ -1,74 +1,78 @@
 """
-SQLite Database Module — Patient Churn Prediction
-==================================================
-Manages users, predictions, and cohort datasets.
+Database Module — Patient Churn Prediction (PostgreSQL / SQLite Compatible)
+===========================================================================
+Manages users, predictions, and cohort datasets via SQLAlchemy.
 """
 
 import os
-import sqlite3
 import hashlib
 import uuid
-from datetime import datetime
-from contextlib import contextmanager
+from sqlalchemy import create_engine, Column, String, Integer, Float, Text, ForeignKey, DateTime
+from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.sql import func
 
-DB_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "patient_churn_prediction.db"
-)
+DB_DIR = os.path.dirname(os.path.abspath(__file__))
+SQLITE_FALLBACK = f"sqlite:///{os.path.join(DB_DIR, 'patient_churn_prediction.db')}"
 
+# Look for DATABASE_URL environment variable (Render PostgreSQL), fallback to SQLite
+DATABASE_URL = os.getenv("DATABASE_URL", SQLITE_FALLBACK)
 
-def get_connection():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    return conn
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-
-@contextmanager
-def get_db():
-    conn = get_connection()
+# Configure engine
+if DATABASE_URL.startswith("sqlite"):
+    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+else:
     try:
-        yield conn
-        conn.commit()
-    finally:
-        conn.close()
+        engine = create_engine(DATABASE_URL)
+        # Test connection
+        with engine.connect() as conn:
+            pass
+    except Exception:
+        # Fallback to local SQLite if remote PostgreSQL is unreachable
+        engine = create_engine(SQLITE_FALLBACK, connect_args={"check_same_thread": False})
+
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(String, primary_key=True)
+    name = Column(String, nullable=False)
+    email = Column(String, unique=True, nullable=False)
+    password_hash = Column(String, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class Prediction(Base):
+    __tablename__ = "predictions"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(String, ForeignKey("users.id"))
+    patient_data = Column(Text)
+    probability = Column(Float)
+    risk_level = Column(String)
+    primary_reason = Column(String)
+    retention_advice = Column(Text)
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class CohortDataset(Base):
+    __tablename__ = "cohort_datasets"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(String, ForeignKey("users.id"))
+    filename = Column(String)
+    total_patients = Column(Integer)
+    high_risk = Column(Integer)
+    medium_risk = Column(Integer)
+    low_risk = Column(Integer)
+    created_at = Column(DateTime, server_default=func.now())
 
 
 def init_db():
-    """Create tables if they don't exist."""
-    with get_db() as conn:
-        conn.executescript("""
-            CREATE TABLE IF NOT EXISTS users (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                email TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL,
-                created_at TEXT DEFAULT (datetime('now'))
-            );
-
-            CREATE TABLE IF NOT EXISTS predictions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id TEXT,
-                patient_data TEXT,
-                probability REAL,
-                risk_level TEXT,
-                primary_reason TEXT,
-                retention_advice TEXT,
-                created_at TEXT DEFAULT (datetime('now')),
-                FOREIGN KEY (user_id) REFERENCES users(id)
-            );
-
-            CREATE TABLE IF NOT EXISTS cohort_datasets (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id TEXT,
-                filename TEXT,
-                total_patients INTEGER,
-                high_risk INTEGER,
-                medium_risk INTEGER,
-                low_risk INTEGER,
-                created_at TEXT DEFAULT (datetime('now')),
-                FOREIGN KEY (user_id) REFERENCES users(id)
-            );
-        """)
+    """Initialize database tables."""
+    Base.metadata.create_all(bind=engine)
 
 
 def hash_password(password: str) -> str:
@@ -78,100 +82,137 @@ def hash_password(password: str) -> str:
 def create_user(name: str, email: str, password: str) -> dict:
     user_id = str(uuid.uuid4())
     pw_hash = hash_password(password)
-    with get_db() as conn:
-        try:
-            conn.execute(
-                "INSERT INTO users (id, name, email, password_hash) VALUES (?, ?, ?, ?)",
-                (user_id, name, email, pw_hash),
-            )
-        except sqlite3.IntegrityError:
+    db = SessionLocal()
+    try:
+        existing = db.query(User).filter(User.email == email).first()
+        if existing:
             return None
-    return {"id": user_id, "name": name, "email": email}
+        new_user = User(id=user_id, name=name, email=email, password_hash=pw_hash)
+        db.add(new_user)
+        db.commit()
+        return {"id": user_id, "name": name, "email": email}
+    except Exception:
+        db.rollback()
+        return None
+    finally:
+        db.close()
 
 
 def authenticate_user(email: str, password: str) -> dict:
     pw_hash = hash_password(password)
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT id, name, email FROM users WHERE email = ? AND password_hash = ?",
-            (email, pw_hash),
-        ).fetchone()
-    if row:
-        return {"id": row["id"], "name": row["name"], "email": row["email"]}
-    return None
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.email == email, User.password_hash == pw_hash).first()
+        if user:
+            return {"id": user.id, "name": user.name, "email": user.email}
+        return None
+    finally:
+        db.close()
 
 
 def get_user_by_id(user_id: str) -> dict:
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT id, name, email FROM users WHERE id = ?", (user_id,)
-        ).fetchone()
-    if row:
-        return {"id": row["id"], "name": row["name"], "email": row["email"]}
-    return None
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if user:
+            return {"id": user.id, "name": user.name, "email": user.email}
+        return None
+    finally:
+        db.close()
 
 
 def save_prediction(user_id: str, patient_data: str, probability: float,
                     risk_level: str, primary_reason: str, retention_advice: str):
-    with get_db() as conn:
-        conn.execute(
-            """INSERT INTO predictions 
-               (user_id, patient_data, probability, risk_level, primary_reason, retention_advice) 
-               VALUES (?, ?, ?, ?, ?, ?)""",
-            (user_id, patient_data, probability, risk_level, primary_reason, retention_advice),
+    db = SessionLocal()
+    try:
+        pred = Prediction(
+            user_id=user_id,
+            patient_data=patient_data,
+            probability=probability,
+            risk_level=risk_level,
+            primary_reason=primary_reason,
+            retention_advice=retention_advice
         )
+        db.add(pred)
+        db.commit()
+    finally:
+        db.close()
 
 
 def save_cohort(user_id: str, filename: str, total: int, high: int, med: int, low: int):
-    with get_db() as conn:
-        conn.execute(
-            """INSERT INTO cohort_datasets 
-               (user_id, filename, total_patients, high_risk, medium_risk, low_risk) 
-               VALUES (?, ?, ?, ?, ?, ?)""",
-            (user_id, filename, total, high, med, low),
+    db = SessionLocal()
+    try:
+        cohort = CohortDataset(
+            user_id=user_id,
+            filename=filename,
+            total_patients=total,
+            high_risk=high,
+            medium_risk=med,
+            low_risk=low
         )
+        db.add(cohort)
+        db.commit()
+    finally:
+        db.close()
 
 
 def get_user_predictions(user_id: str, limit: int = 50) -> list:
-    with get_db() as conn:
-        rows = conn.execute(
-            "SELECT * FROM predictions WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
-            (user_id, limit),
-        ).fetchall()
-    return [dict(r) for r in rows]
+    db = SessionLocal()
+    try:
+        preds = db.query(Prediction).filter(Prediction.user_id == user_id)\
+                    .order_by(Prediction.created_at.desc())\
+                    .limit(limit).all()
+        return [{
+            "id": p.id,
+            "user_id": p.user_id,
+            "patient_data": p.patient_data,
+            "probability": p.probability,
+            "risk_level": p.risk_level,
+            "primary_reason": p.primary_reason,
+            "retention_advice": p.retention_advice,
+            "created_at": str(p.created_at)
+        } for p in preds]
+    finally:
+        db.close()
 
 
 def get_user_analytics(user_id: str) -> dict:
-    with get_db() as conn:
-        preds = conn.execute(
-            "SELECT probability, risk_level FROM predictions WHERE user_id = ?",
-            (user_id,),
-        ).fetchall()
-        cohorts = conn.execute(
-            "SELECT * FROM cohort_datasets WHERE user_id = ? ORDER BY created_at DESC LIMIT 10",
-            (user_id,),
-        ).fetchall()
+    db = SessionLocal()
+    try:
+        preds = db.query(Prediction).filter(Prediction.user_id == user_id).all()
+        cohorts = db.query(CohortDataset).filter(CohortDataset.user_id == user_id)\
+                    .order_by(CohortDataset.created_at.desc()).limit(10).all()
 
-    if not preds:
+        if not preds:
+            return {
+                "total_evaluated": 0,
+                "avg_churn": 0,
+                "high_risk_count": 0,
+                "medium_risk_count": 0,
+                "low_risk_count": 0,
+                "cohort_uploads": [],
+            }
+
+        probabilities = [p.probability for p in preds]
         return {
-            "total_evaluated": 0,
-            "avg_churn": 0,
-            "high_risk_count": 0,
-            "medium_risk_count": 0,
-            "low_risk_count": 0,
-            "cohort_uploads": [],
+            "total_evaluated": len(preds),
+            "avg_churn": round(sum(probabilities) / len(probabilities) * 100, 1),
+            "high_risk_count": sum(1 for p in preds if p.risk_level == "High"),
+            "medium_risk_count": sum(1 for p in preds if p.risk_level == "Medium"),
+            "low_risk_count": sum(1 for p in preds if p.risk_level == "Low"),
+            "cohort_uploads": [{
+                "id": c.id,
+                "filename": c.filename,
+                "total_patients": c.total_patients,
+                "high_risk": c.high_risk,
+                "medium_risk": c.medium_risk,
+                "low_risk": c.low_risk,
+                "created_at": str(c.created_at)
+            } for c in cohorts],
         }
-
-    probabilities = [r["probability"] for r in preds]
-    return {
-        "total_evaluated": len(preds),
-        "avg_churn": round(sum(probabilities) / len(probabilities) * 100, 1),
-        "high_risk_count": sum(1 for r in preds if r["risk_level"] == "High"),
-        "medium_risk_count": sum(1 for r in preds if r["risk_level"] == "Medium"),
-        "low_risk_count": sum(1 for r in preds if r["risk_level"] == "Low"),
-        "cohort_uploads": [dict(c) for c in cohorts],
-    }
+    finally:
+        db.close()
 
 
-# Auto-init
+# Auto-init tables
 init_db()

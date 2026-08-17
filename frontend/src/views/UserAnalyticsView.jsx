@@ -10,9 +10,15 @@ export default function UserAnalyticsView() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) { setLoading(false); return; }
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     Promise.all([getUserAnalytics(), getHistory()])
-      .then(([a, h]) => { setAnalytics(a); setHistory(h.history || []); })
+      .then(([a, h]) => {
+        setAnalytics(a);
+        setHistory(h.history || []);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [user]);
@@ -21,47 +27,45 @@ export default function UserAnalyticsView() {
     return (
       <div className="view-container">
         <div className="analytics-empty">
-          <span>🔒</span>
-          <h3>Sign in to view your analytics</h3>
-          <p>Your prediction history and analytics are saved when you're signed in.</p>
+          <h3>Authentication Required</h3>
+          <p>Please sign in to view your analytics and prediction history.</p>
         </div>
       </div>
     );
   }
 
   if (loading) {
-    return <div className="view-container"><p>Loading analytics...</p></div>;
+    return (
+      <div className="view-container">
+        <p>Loading analytics data...</p>
+      </div>
+    );
   }
 
   return (
     <div className="view-container">
-      <h1 className="view-title">Your Analytics Dashboard</h1>
-      <p className="view-desc">Track your prediction history and patient risk patterns.</p>
+      <h1 className="view-title">User Analytics Dashboard</h1>
+      <p className="view-desc">Track your patient prediction history, cohort uploads, and risk distribution metrics.</p>
 
       {analytics && (
         <div className="analytics-cards">
           <div className="an-card">
-            <span className="an-icon">📊</span>
             <span className="an-val">{analytics.total_evaluated}</span>
             <span className="an-label">Total Evaluated</span>
           </div>
           <div className="an-card">
-            <span className="an-icon">📈</span>
             <span className="an-val">{analytics.avg_churn}%</span>
             <span className="an-label">Avg Churn Risk</span>
           </div>
           <div className="an-card danger">
-            <span className="an-icon">🔴</span>
             <span className="an-val">{analytics.high_risk_count}</span>
             <span className="an-label">High Risk</span>
           </div>
           <div className="an-card warning">
-            <span className="an-icon">🟡</span>
             <span className="an-val">{analytics.medium_risk_count}</span>
             <span className="an-label">Medium Risk</span>
           </div>
           <div className="an-card success">
-            <span className="an-icon">🟢</span>
             <span className="an-val">{analytics.low_risk_count}</span>
             <span className="an-label">Low Risk</span>
           </div>
@@ -71,7 +75,7 @@ export default function UserAnalyticsView() {
       {/* Cohort Upload History */}
       {analytics?.cohort_uploads?.length > 0 && (
         <div className="analytics-section">
-          <h3>📁 Cohort Upload History</h3>
+          <h3>Cohort Upload History</h3>
           <div className="cohort-history-grid">
             {analytics.cohort_uploads.map((c, i) => (
               <div key={i} className="cohort-history-card">
@@ -91,9 +95,9 @@ export default function UserAnalyticsView() {
 
       {/* Prediction History */}
       <div className="analytics-section">
-        <h3>🕐 Recent Prediction History</h3>
+        <h3>Recent Prediction History</h3>
         {history.length === 0 ? (
-          <p className="analytics-empty-text">No predictions yet. Start by assessing a patient.</p>
+          <p className="analytics-empty-text">No prediction records found yet. Start by assessing a patient.</p>
         ) : (
           <div className="history-table-wrap">
             <table className="history-table">
@@ -110,8 +114,12 @@ export default function UserAnalyticsView() {
                 {history.slice(0, 20).map((h, i) => (
                   <tr key={i}>
                     <td>{i + 1}</td>
-                    <td><strong>{(h.probability * 100).toFixed(1)}%</strong></td>
-                    <td><span className={`risk-tag ${h.risk_level.toLowerCase()}`}>{h.risk_level}</span></td>
+                    <td>
+                      <strong>{(h.probability * 100).toFixed(1)}%</strong>
+                    </td>
+                    <td>
+                      <span className={`risk-tag ${h.risk_level.toLowerCase()}`}>{h.risk_level}</span>
+                    </td>
                     <td className="reason-cell">{h.primary_reason}</td>
                     <td>{new Date(h.created_at).toLocaleDateString()}</td>
                   </tr>

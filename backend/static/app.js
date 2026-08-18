@@ -286,50 +286,32 @@ function viewPatient(id) {
   const patient = STATE.dataset.find(p => p.patient_id === id);
   if(!patient) return;
   
-  $('adv-patient-id').innerText = patient.patient_id;
+  $('adv-empty').classList.add('hidden');
+  $('adv-card').classList.remove('hidden');
   
-  // Render details
-  const advice = patient.retention_advice;
-  const reason = patient.primary_churn_reason;
-  const interventions = patient.interventions || [];
+  $('adv-patient-id').innerText = patient.patient_id || 'Unknown';
+  $('adv-icon').innerText = (patient.patient_id || 'P').charAt(0).toUpperCase();
+  $('adv-prob').innerText = patient.percentage + '%';
   
-  let interventionsHtml = '';
-  if (interventions.length > 0) {
-    interventions.forEach(i => {
-      interventionsHtml += `
-      <div style="background:#f8fafc; padding:15px; border-radius:8px; margin-bottom:10px; border-left:4px solid #3b82f6;">
-        <strong>${i.icon} ${i.priority.toUpperCase()} PRIORITY:</strong> ${i.text}
+  const rt = $('adv-risk-tag');
+  rt.innerText = patient.risk_level + ' Risk';
+  rt.style.background = patient.risk_level === 'High' ? '#ef4444' : (patient.risk_level === 'Medium' ? '#f59e0b' : '#22c55e');
+  
+  $('adv-status').innerText = patient.percentage >= 50 ? 'Likely to Churn' : 'Likely Retained';
+  $('adv-reason').innerText = patient.primary_churn_reason;
+  $('adv-advice').innerText = patient.retention_advice;
+  
+  let attrHtml = '';
+  if (patient.attributes) {
+    Object.entries(patient.attributes).forEach(([k, v]) => {
+      attrHtml += `
+      <div style="border:1px solid #e5e7eb; border-radius:8px; padding:16px; background:#fafafa;">
+        <div style="font-size:11px; font-weight:bold; color:#6b7280; margin-bottom:6px; letter-spacing:0.5px;">${k.toUpperCase()}</div>
+        <div style="font-size:15px; font-weight:bold; color:#111827;">${v !== null && v !== undefined ? v : 'N/A'}</div>
       </div>`;
     });
-  } else {
-    interventionsHtml = `
-    <div style="background:#f8fafc; padding:15px; border-radius:8px; border-left:4px solid #3b82f6;">
-      <strong>Action:</strong> ${advice}
-    </div>`;
   }
-  
-  $('adv-content').innerHTML = `
-    <div style="display:flex; gap:20px;">
-      <div style="flex:1; background:white; padding:20px; border-radius:12px; border:1px solid #e5e7eb;">
-        <h3 style="font-size:24px; font-weight:700; color:#1e293b; margin-bottom:10px;">${patient.percentage}% Risk</h3>
-        <p style="color:#64748b;">${reason}</p>
-      </div>
-      <div style="flex:2; background:white; padding:20px; border-radius:12px; border:1px solid #e5e7eb;">
-        <h3 style="margin-bottom:15px; font-size:16px;">Recommended Interventions</h3>
-        ${interventionsHtml}
-      </div>
-    </div>
-    
-    <h3 style="margin-top:30px; margin-bottom:15px;">Patient Attributes</h3>
-    <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:15px;">
-      ${Object.entries(patient.attributes || {}).map(([k,v]) => `
-        <div style="background:#f1f5f9; padding:12px; border-radius:8px;">
-          <div style="font-size:12px; color:#64748b; margin-bottom:4px; text-transform:uppercase;">${k}</div>
-          <div style="font-weight:600; color:#1e293b;">${v}</div>
-        </div>
-      `).join('')}
-    </div>
-  `;
+  $('adv-attributes').innerHTML = attrHtml;
   
   navigate('advisor');
 }

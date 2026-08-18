@@ -1,4 +1,6 @@
-<!DOCTYPE html>
+import re
+
+html = """<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -319,3 +321,6 @@
   <script src="/static/app.js"></script>
 </body>
 </html>
+"""
+with open("/home/pavana/Patient-Churn-Prediction-and-Retention-Advisor/backend/static/index.html", "w") as f:
+    f.write(html)

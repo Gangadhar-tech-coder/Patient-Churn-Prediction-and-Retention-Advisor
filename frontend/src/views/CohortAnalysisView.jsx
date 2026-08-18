@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { batchPredict } from "../utils/api";
 import RiskPieChart from "../components/RiskPieChart";
 import PatientDetailsModal from "../components/PatientDetailsModal";
@@ -6,17 +6,29 @@ import "./views.css";
 
 const PAGE_SIZE = 15;
 
-export default function CohortAnalysisView() {
+export default function CohortAnalysisView({ onNavigate }) {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState("all");
+  const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   const inputRef = useRef(null);
+
+  useEffect(() => {
+    const savedResults = localStorage.getItem("cohortResults");
+    const savedFile = localStorage.getItem("cohortFile");
+    const savedPreview = localStorage.getItem("cohortPreview");
+    if (savedResults && savedFile) {
+      setResults(JSON.parse(savedResults));
+      setFile(JSON.parse(savedFile));
+      if (savedPreview) setPreview(JSON.parse(savedPreview));
+    }
+  }, []);
 
   const handleDrag = (e) => {
     e.preventDefault();
@@ -68,6 +80,9 @@ export default function CohortAnalysisView() {
     setError(null);
     setCurrentPage(1);
     setSelectedPatient(null);
+    localStorage.removeItem("cohortResults");
+    localStorage.removeItem("cohortFile");
+    localStorage.removeItem("cohortPreview");
     if (inputRef.current) inputRef.current.value = "";
   };
 
@@ -78,6 +93,9 @@ export default function CohortAnalysisView() {
     try {
       const data = await batchPredict(file);
       setResults(data);
+      localStorage.setItem("cohortResults", JSON.stringify(data));
+      localStorage.setItem("cohortFile", JSON.stringify({ name: file.name, size: file.size }));
+      localStorage.setItem("cohortPreview", JSON.stringify(preview));
       setCurrentPage(1);
     } catch (err) {
       setError(err.message);
@@ -92,9 +110,11 @@ export default function CohortAnalysisView() {
 
   // Filtered patient list
   const filteredResults =
-    results?.results?.filter((r) =>
-      filter === "all" ? true : r.risk_level.toLowerCase() === filter
-    ) || [];
+    results?.results?.filter((r) => {
+      const matchFilter = filter === "all" ? true : r.risk_level.toLowerCase() === filter;
+      const matchSearch = searchTerm === "" ? true : (r.patient_id || `P-${r.index + 1}`).toLowerCase().includes(searchTerm.toLowerCase());
+      return matchFilter && matchSearch;
+    }) || [];
 
   // Pagination calculation
   const totalPages = Math.ceil(filteredResults.length / PAGE_SIZE) || 1;
@@ -333,26 +353,40 @@ export default function CohortAnalysisView() {
           </div>
 
           {/* Filter Pills */}
-          <div className="filter-pills">
-            <h3>Patients Cohort List</h3>
-            <div className="pills-row">
-              {[
-                { key: "all", label: `All (${results.total})` },
-                { key: "high", label: `High Risk (${results.high_risk})` },
-                { key: "medium", label: `Medium Risk (${results.medium_risk})` },
-                { key: "low", label: `Low Risk (${results.low_risk})` },
-              ].map((p) => (
-                <button
-                  key={p.key}
-                  className={`pill ${filter === p.key ? "active" : ""}`}
-                  onClick={() => {
-                    setFilter(p.key);
-                    setCurrentPage(1);
-                  }}
-                >
-                  {p.label}
-                </button>
-              ))}
+          <div className="filter-pills" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <h3>Patients Cohort List</h3>
+              <div className="pills-row" style={{ marginTop: 10 }}>
+                {[
+                  { key: "all", label: `All (${results.total})` },
+                  { key: "high", label: `High Risk (${results.high_risk})` },
+                  { key: "medium", label: `Medium Risk (${results.medium_risk})` },
+                  { key: "low", label: `Low Risk (${results.low_risk})` },
+                ].map((p) => (
+                  <button
+                    key={p.key}
+                    className={`pill ${filter === p.key ? "active" : ""}`}
+                    onClick={() => {
+                      setFilter(p.key);
+                      setCurrentPage(1);
+                    }}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <input
+                type="text"
+                placeholder="Search Patient ID..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
+                style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #ccc", minWidth: "250px" }}
+              />
             </div>
           </div>
 
@@ -382,7 +416,10 @@ export default function CohortAnalysisView() {
                     </td>
                     <td className="reason-cell">{r.primary_churn_reason}</td>
                     <td>
-                      <button className="view-patient-btn" onClick={() => setSelectedPatient(r)}>
+                      <button className="view-patient-btn" onClick={() => {
+                        localStorage.setItem("selectedPatientDetails", JSON.stringify(r));
+                        onNavigate("advisor");
+                      }}>
                         View Details
                       </button>
                     </td>
@@ -419,10 +456,7 @@ export default function CohortAnalysisView() {
         </>
       )}
 
-      {/* Details Modal */}
-      {selectedPatient && (
-        <PatientDetailsModal patient={selectedPatient} onClose={() => setSelectedPatient(null)} />
-      )}
+      {/* Details Modal was here, now redirected */}
     </div>
   );
 }

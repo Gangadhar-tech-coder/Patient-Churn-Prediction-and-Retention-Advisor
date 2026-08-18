@@ -1,372 +1,257 @@
-import { useState } from "react";
-import { predictChurn } from "../utils/api";
-import ProbabilityGauge from "../components/ProbabilityGauge";
-import WhatIfSimulator from "../components/WhatIfSimulator";
+import { useState, useEffect } from "react";
 import "./views.css";
 
-const STATES = ["CA", "FL", "GA", "IL", "MI", "NC", "NY", "OH", "PA", "TX"];
-const SPECIALTIES = [
-  "Cardiology",
-  "Family Medicine",
-  "General Practice",
-  "Internal Medicine",
-  "Neurology",
-  "Orthopedics",
-  "Pediatrics",
-];
-const INSURANCE_TYPES = ["Medicaid", "Medicare", "Private", "Self-Pay"];
-
-const DEFAULT_FORM = {
-  age: 58,
-  gender: "Female",
-  state: "CA",
-  specialty: "General Practice",
-  insurance_type: "Private",
-  tenure_months: 24,
-  referrals_made: 1,
-  visits_last_year: 2,
-  missed_appointments: 3,
-  days_since_last_visit: 190,
-  portal_usage: 0,
-  overall_satisfaction: 2.1,
-  wait_time_satisfaction: 1.8,
-  staff_satisfaction: 2.5,
-  provider_rating: 3.0,
-  avg_out_of_pocket_cost: 1450,
-  distance_to_facility: 28.5,
-  billing_issues: 1,
-};
-
 export default function RetentionAdvisorView() {
-  const [form, setForm] = useState(DEFAULT_FORM);
-  const [prediction, setPrediction] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [patient, setPatient] = useState(null);
 
-  const update = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
-  const numChange = (field, val, parser = parseInt) => {
-    if (val === "") update(field, "");
-    else {
-      const p = parser(val);
-      update(field, isNaN(p) ? "" : p);
+  useEffect(() => {
+    const saved = localStorage.getItem("selectedPatientDetails");
+    if (saved) {
+      setPatient(JSON.parse(saved));
     }
-  };
+  }, []);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    try {
-      const payload = {
-        ...form,
-        age: Number(form.age) || 41,
-        tenure_months: Number(form.tenure_months) || 24,
-        referrals_made: Number(form.referrals_made) || 0,
-        visits_last_year: Number(form.visits_last_year) || 1,
-        missed_appointments: Number(form.missed_appointments) || 0,
-        days_since_last_visit: Number(form.days_since_last_visit) || 90,
-        avg_out_of_pocket_cost: Number(form.avg_out_of_pocket_cost) || 300,
-        distance_to_facility: Number(form.distance_to_facility) || 10,
-        overall_satisfaction: Number(form.overall_satisfaction),
-        wait_time_satisfaction: Number(form.wait_time_satisfaction),
-        staff_satisfaction: Number(form.staff_satisfaction),
-        provider_rating: Number(form.provider_rating),
-      };
-      const result = await predictChurn(payload);
-      setPrediction(result);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  if (!patient) {
+    return (
+      <div className="view-container">
+        <h1 className="view-title">Retention Advisor</h1>
+        <p className="view-desc">
+          No patient selected. Please navigate to Cohort Analysis, upload a dataset, and click "View Details" on a patient.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="view-container">
-      <h1 className="view-title">Individual Patient Churn Assessment</h1>
-      <p className="view-desc">
-        Evaluate patient churn probability, uncover diagnostic risk factors, and generate a personalized retention plan.
-      </p>
-
-      {error && <div className="view-error">{error}</div>}
-
-      <form onSubmit={handleSubmit} className="assessment-form">
-        {/* Section 1: Patient Profile & Demographics */}
-        <div className="form-section">
-          <h3>1. Patient Demographics & Profile</h3>
-          <div className="form-grid-4">
-            <Field label="Age (years)" required hint="Range: 18 – 90 years">
-              <input
-                type="number"
-                min={18}
-                max={90}
-                value={form.age}
-                onChange={(e) => numChange("age", e.target.value)}
-              />
-            </Field>
-            <Field label="Gender" required>
-              <select value={form.gender} onChange={(e) => update("gender", e.target.value)}>
-                <option>Female</option>
-                <option>Male</option>
-              </select>
-            </Field>
-            <Field label="State" required>
-              <select value={form.state} onChange={(e) => update("state", e.target.value)}>
-                {STATES.map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Medical Specialty" required>
-              <select value={form.specialty} onChange={(e) => update("specialty", e.target.value)}>
-                {SPECIALTIES.map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
-              </select>
-            </Field>
-          </div>
-          <div className="form-grid-2">
-            <Field label="Insurance Type" required>
-              <select value={form.insurance_type} onChange={(e) => update("insurance_type", e.target.value)}>
-                {INSURANCE_TYPES.map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
-              </select>
-            </Field>
-          </div>
-        </div>
-
-        {/* Section 2: Clinical Engagement & Recency */}
-        <div className="form-section">
-          <h3>2. Clinical Engagement & Recency</h3>
-          <div className="form-grid-4">
-            <Field label="Tenure (Months)" required hint="Range: 1 – 120 months">
-              <input
-                type="number"
-                min={1}
-                max={120}
-                value={form.tenure_months}
-                onChange={(e) => numChange("tenure_months", e.target.value)}
-              />
-            </Field>
-            <Field label="Visits Last Year" required hint="Range: 0 – 20 visits">
-              <input
-                type="number"
-                min={0}
-                max={20}
-                value={form.visits_last_year}
-                onChange={(e) => numChange("visits_last_year", e.target.value)}
-              />
-            </Field>
-            <Field label="Missed Appointments" required hint="Range: 0 – 10 missed">
-              <input
-                type="number"
-                min={0}
-                max={10}
-                value={form.missed_appointments}
-                onChange={(e) => numChange("missed_appointments", e.target.value)}
-              />
-            </Field>
-            <Field label="Days Since Last Visit" required hint="Range: 1 – 730 days">
-              <input
-                type="number"
-                min={1}
-                max={730}
-                value={form.days_since_last_visit}
-                onChange={(e) => numChange("days_since_last_visit", e.target.value)}
-              />
-            </Field>
-          </div>
-          <div className="form-grid-2">
-            <Field label="Patient Portal Activity" required>
-              <select value={form.portal_usage} onChange={(e) => update("portal_usage", Number(e.target.value))}>
-                <option value={0}>0 — Inactive / Not Enrolled</option>
-                <option value={1}>1 — Active User</option>
-              </select>
-            </Field>
-            <Field label="Referrals Made" required hint="Range: 0 – 5 referrals">
-              <input
-                type="number"
-                min={0}
-                max={5}
-                value={form.referrals_made}
-                onChange={(e) => numChange("referrals_made", e.target.value)}
-              />
-            </Field>
-          </div>
-        </div>
-
-        {/* Section 3: Patient Satisfaction */}
-        <div className="form-section">
-          <h3>
-            3. Patient Satisfaction Scores
-            <span className="section-badge">Valid Scale: 1.0 – 5.0</span>
-          </h3>
-          <div className="form-grid-4">
-            <Field label="Overall Satisfaction" required>
-              <input
-                type="number"
-                min={1}
-                max={5}
-                step={0.1}
-                value={form.overall_satisfaction}
-                onChange={(e) => numChange("overall_satisfaction", e.target.value, parseFloat)}
-              />
-            </Field>
-            <Field label="Wait Time Satisfaction" required>
-              <input
-                type="number"
-                min={1}
-                max={5}
-                step={0.1}
-                value={form.wait_time_satisfaction}
-                onChange={(e) => numChange("wait_time_satisfaction", e.target.value, parseFloat)}
-              />
-            </Field>
-            <Field label="Staff Satisfaction" required>
-              <input
-                type="number"
-                min={1}
-                max={5}
-                step={0.1}
-                value={form.staff_satisfaction}
-                onChange={(e) => numChange("staff_satisfaction", e.target.value, parseFloat)}
-              />
-            </Field>
-            <Field label="Provider Rating" required>
-              <input
-                type="number"
-                min={1}
-                max={5}
-                step={0.1}
-                value={form.provider_rating}
-                onChange={(e) => numChange("provider_rating", e.target.value, parseFloat)}
-              />
-            </Field>
-          </div>
-        </div>
-
-        {/* Section 4: Cost & Accessibility */}
-        <div className="form-section">
-          <h3>4. Cost & Accessibility</h3>
-          <div className="form-grid-3">
-            <Field label="Average Out-of-Pocket Cost ($)" required hint="Range: $20 – $2,000">
-              <input
-                type="number"
-                min={20}
-                max={2000}
-                value={form.avg_out_of_pocket_cost}
-                onChange={(e) => numChange("avg_out_of_pocket_cost", e.target.value)}
-              />
-            </Field>
-            <Field label="Unresolved Billing Issues" required>
-              <select value={form.billing_issues} onChange={(e) => update("billing_issues", Number(e.target.value))}>
-                <option value={0}>0 — No billing issues</option>
-                <option value={1}>1 — Active billing dispute</option>
-              </select>
-            </Field>
-            <Field label="Distance to Facility (miles)" required hint="Range: 0.5 – 50 miles">
-              <input
-                type="number"
-                min={0.5}
-                max={50}
-                step={0.5}
-                value={form.distance_to_facility}
-                onChange={(e) => numChange("distance_to_facility", e.target.value, parseFloat)}
-              />
-            </Field>
-          </div>
-        </div>
-
-        <div className="form-submit-row">
-          <button type="submit" className="predict-btn" disabled={loading}>
-            {loading ? "Analyzing Patient Risk..." : "Predict Churn Risk"}
-          </button>
-        </div>
-      </form>
-
-      {/* Prediction Results */}
-      {prediction && (
-        <div className="prediction-results">
-          <h2 className="results-title">Assessment Results</h2>
-          <div className="results-grid">
-            <div className="results-gauge-card">
-              <ProbabilityGauge percentage={prediction.percentage} riskLevel={prediction.risk_level} />
-              <div className="prediction-label">
-                Prediction Status:{" "}
-                <strong>{prediction.percentage >= 50 ? "Likely to Churn" : "Likely Retained"}</strong>
-              </div>
+      <div
+        className="patient-details-card"
+        style={{
+          background: "#fff",
+          borderRadius: "8px",
+          padding: "24px",
+          boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
+          maxWidth: "800px",
+          margin: "0 auto",
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            borderBottom: "1px solid #e5e7eb",
+            paddingBottom: "16px",
+            marginBottom: "24px",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div
+              style={{
+                background: "#2563eb",
+                color: "white",
+                width: "48px",
+                height: "48px",
+                borderRadius: "12px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontWeight: "bold",
+                fontSize: "24px",
+              }}
+            >
+              {patient.patient_id ? patient.patient_id.charAt(0).toUpperCase() : "P"}
             </div>
-            <div className="results-info-card">
-              <div className="result-block reason-block">
-                <span className="result-block-label">PRIMARY RISK FACTOR</span>
-                <p>{prediction.primary_churn_reason}</p>
-              </div>
-              <div className="result-block advice-block">
-                <span className="result-block-label">RECOMMENDED RETENTION STRATEGY</span>
-                <p>{prediction.retention_advice}</p>
-              </div>
+            <div>
+              <h2 style={{ margin: 0, fontSize: "22px", color: "#111827" }}>
+                Patient Details — {patient.patient_id || "Unknown"}
+              </h2>
+              <p style={{ margin: 0, fontSize: "14px", color: "#6b7280" }}>
+                Comprehensive Profile & Churn Assessment
+              </p>
             </div>
           </div>
-
-          {/* Interventions */}
-          {prediction.interventions && prediction.interventions.length > 0 && (
-            <div className="interventions-section">
-              <h3>Recommended Action Plan</h3>
-              <div className="interventions-grid">
-                {prediction.interventions.map((item, i) => (
-                  <div key={i} className={`intervention-chip ${item.priority}`}>
-                    <span className="intervention-text">{item.text}</span>
-                    <span className={`priority-dot ${item.priority}`} />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Feature Risk Factor Analysis */}
-          {prediction.feature_contributions && (
-            <div className="contributions-section">
-              <h3>Risk Factor Analysis</h3>
-              <div className="contribution-bars">
-                {prediction.feature_contributions.map((c, i) => (
-                  <div key={i} className="contribution-row">
-                    <span className="contrib-label">{c.factor}</span>
-                    <div className="contrib-bar-track">
-                      <div
-                        className="contrib-bar-fill"
-                        style={{
-                          width: `${Math.round(c.risk_impact * 100)}%`,
-                          background:
-                            c.risk_impact > 0.6 ? "#ef4444" : c.risk_impact > 0.3 ? "#f59e0b" : "#22c55e",
-                        }}
-                      />
-                    </div>
-                    <span className="contrib-val">{Math.round(c.risk_impact * 100)}%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
-      )}
 
-      {/* What-If Simulator */}
-      <div style={{ marginTop: 32 }}>
-        <WhatIfSimulator />
+        {/* Top Cards: Probability, Risk, Status */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr 1fr",
+            gap: "16px",
+            background: "#f8fafc",
+            padding: "20px",
+            borderRadius: "8px",
+            marginBottom: "16px",
+          }}
+        >
+          <div>
+            <div
+              style={{
+                fontSize: "12px",
+                fontWeight: "bold",
+                color: "#64748b",
+                letterSpacing: "0.5px",
+                marginBottom: "8px",
+              }}
+            >
+              CHURN PROBABILITY
+            </div>
+            <div style={{ fontSize: "28px", fontWeight: "bold", color: "#2563eb" }}>
+              {patient.percentage}%
+            </div>
+          </div>
+          <div>
+            <div
+              style={{
+                fontSize: "12px",
+                fontWeight: "bold",
+                color: "#64748b",
+                letterSpacing: "0.5px",
+                marginBottom: "8px",
+              }}
+            >
+              RISK TIER
+            </div>
+            <div>
+              <span
+                style={{
+                  background:
+                    patient.risk_level === "High"
+                      ? "#ef4444"
+                      : patient.risk_level === "Medium"
+                      ? "#f59e0b"
+                      : "#22c55e",
+                  color: "white",
+                  padding: "6px 12px",
+                  borderRadius: "6px",
+                  fontSize: "14px",
+                  fontWeight: "bold",
+                }}
+              >
+                {patient.risk_level} Risk
+              </span>
+            </div>
+          </div>
+          <div>
+            <div
+              style={{
+                fontSize: "12px",
+                fontWeight: "bold",
+                color: "#64748b",
+                letterSpacing: "0.5px",
+                marginBottom: "8px",
+              }}
+            >
+              PREDICTION STATUS
+            </div>
+            <div style={{ fontSize: "18px", fontWeight: "bold", color: "#111827" }}>
+              {patient.percentage >= 50 ? "Likely to Churn" : "Likely Retained"}
+            </div>
+          </div>
+        </div>
+
+        {/* Primary Reason */}
+        <div
+          style={{
+            background: "#fef9c3",
+            border: "1px solid #fde047",
+            padding: "20px",
+            borderRadius: "8px",
+            marginBottom: "16px",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "12px",
+              fontWeight: "bold",
+              color: "#854d0e",
+              letterSpacing: "0.5px",
+              marginBottom: "8px",
+            }}
+          >
+            PRIMARY CHURN REASON
+          </div>
+          <div style={{ fontSize: "16px", color: "#111827" }}>
+            {patient.primary_churn_reason}
+          </div>
+        </div>
+
+        {/* Retention Advice */}
+        <div
+          style={{
+            background: "#eff6ff",
+            border: "1px solid #bfdbfe",
+            padding: "20px",
+            borderRadius: "8px",
+            marginBottom: "32px",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "12px",
+              fontWeight: "bold",
+              color: "#1e40af",
+              letterSpacing: "0.5px",
+              marginBottom: "8px",
+            }}
+          >
+            RECOMMENDED RETENTION ADVICE
+          </div>
+          <div style={{ fontSize: "18px", color: "#1e3a8a", lineHeight: "1.6" }}>
+            {patient.retention_advice}
+          </div>
+        </div>
+
+        {/* Profile Attributes */}
+        <h3
+          style={{
+            fontSize: "18px",
+            marginBottom: "16px",
+            color: "#111827",
+            fontWeight: "bold",
+          }}
+        >
+          Patient Profile Attributes
+        </h3>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px" }}>
+          <AttributeCard label="AGE" value="N/A" />
+          <AttributeCard label="GENDER" value="N/A" />
+          <AttributeCard label="STATE" value="N/A" />
+          <AttributeCard label="SPECIALTY" value="N/A" />
+          <AttributeCard label="INSURANCE TYPE" value="N/A" />
+          <AttributeCard label="TENURE (MONTHS)" value="N/A" />
+        </div>
       </div>
     </div>
   );
 }
 
-function Field({ label, required, hint, children }) {
+function AttributeCard({ label, value }) {
   return (
-    <div className="form-field">
-      <label>
-        {label} {required && <span className="req">*</span>}
-      </label>
-      {children}
-      {hint && <span className="field-hint">{hint}</span>}
+    <div
+      style={{
+        border: "1px solid #e5e7eb",
+        borderRadius: "8px",
+        padding: "16px",
+        background: "#fafafa",
+      }}
+    >
+      <div
+        style={{
+          fontSize: "11px",
+          fontWeight: "bold",
+          color: "#6b7280",
+          marginBottom: "6px",
+          letterSpacing: "0.5px",
+        }}
+      >
+        {label}
+      </div>
+      <div style={{ fontSize: "15px", fontWeight: "bold", color: "#111827" }}>
+        {value}
+      </div>
     </div>
   );
 }

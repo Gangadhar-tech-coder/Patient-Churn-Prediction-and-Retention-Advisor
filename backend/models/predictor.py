@@ -88,9 +88,9 @@ class ChurnPredictor:
     @staticmethod
     def _classify_risk(probability: float) -> Tuple[str, str]:
         """Classify into High / Medium / Low risk tier."""
-        if probability >= 0.65:
+        if probability >= 0.75:
             return "High", "risk-high"
-        elif probability >= 0.45:
+        elif probability >= 0.50:
             return "Medium", "risk-medium"
         else:
             return "Low", "risk-low"
@@ -99,7 +99,7 @@ class ChurnPredictor:
         self, df_input: pd.DataFrame, patient: PatientInput, probability: float
     ) -> Tuple[str, str]:
         """Predict primary churn reason and map retention advice."""
-        if probability < 0.45:
+        if probability < 0.50:
             reason = "Not currently at risk (satisfied / engaged patient)"
         else:
             if patient.missed_appointments >= 3:
@@ -167,7 +167,7 @@ class ChurnPredictor:
             pct = round(prob * 100, 1)
             risk_level, _ = self._classify_risk(prob)
 
-            if prob < 0.45:
+            if prob < 0.50:
                 reason = "Not currently at risk (satisfied / engaged patient)"
             else:
                 if row.get("Missed_Appointments", 0) >= 3:

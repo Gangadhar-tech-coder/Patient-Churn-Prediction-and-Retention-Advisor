@@ -5,7 +5,6 @@ import Sidebar from "./components/Sidebar";
 import HomeView from "./views/HomeView";
 import RetentionAdvisorView from "./views/RetentionAdvisorView";
 import CohortAnalysisView from "./views/CohortAnalysisView";
-import UserAnalyticsView from "./views/UserAnalyticsView";
 import LoginPage from "./views/LoginPage";
 import "./App.css";
 
@@ -34,9 +33,7 @@ function AppContent() {
       case "advisor":
         return <RetentionAdvisorView />;
       case "cohort":
-        return <CohortAnalysisView />;
-      case "analytics":
-        return <UserAnalyticsView />;
+        return <CohortAnalysisView onNavigate={setActiveView} />;
       default:
         return <HomeView onNavigate={setActiveView} />;
     }

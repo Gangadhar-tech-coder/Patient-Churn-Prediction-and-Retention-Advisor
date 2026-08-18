@@ -121,6 +121,17 @@ function navigate(view) {
   $(`view-${view}`).classList.remove('hidden');
   
   if (view === 'cohort') renderCohortView();
+  if (view === 'advisor') renderAdvisorView();
+}
+
+function renderAdvisorView() {
+  if (!STATE.dataset) {
+    if ($('advisor-content')) $('advisor-content').classList.add('hidden');
+    if ($('advisor-empty-state')) $('advisor-empty-state').classList.remove('hidden');
+    return;
+  }
+  if ($('advisor-content')) $('advisor-content').classList.remove('hidden');
+  if ($('advisor-empty-state')) $('advisor-empty-state').classList.add('hidden');
 }
 
 // Upload
@@ -144,7 +155,7 @@ async function handleFileUpload(e) {
     if (!res.ok) throw new Error(d.error || "Upload failed");
     
     STATE.dataset = d.results;
-    STATE.columns = d.columns || [];
+    STATE.columns = d.results[0] && d.results[0].attributes ? Object.keys(d.results[0].attributes) : ["Patient ID"];
     STATE.stats = { total: d.total, high: d.high_risk, medium: d.medium_risk, low: d.low_risk };
     
     // Update analytics
@@ -170,11 +181,15 @@ async function handleFileUpload(e) {
 // Cohort View
 function renderCohortView() {
   if (!STATE.dataset) {
-    $('cohort-content').classList.add('hidden');
-    // Don't show anything, or we could add a cohort-empty div
+    if ($('cohort-content')) $('cohort-content').classList.add('hidden');
+    if ($('cohort-drop')) $('cohort-drop').classList.remove('hidden');
+    if ($('clear-dataset-btn')) $('clear-dataset-btn').classList.add('hidden');
+    if ($('analytics-dashboard')) $('analytics-dashboard').classList.add('hidden');
     return;
   }
-  $('cohort-content').classList.remove('hidden');
+  if ($('cohort-content')) $('cohort-content').classList.remove('hidden');
+  if ($('cohort-drop')) $('cohort-drop').classList.add('hidden');
+  if ($('clear-dataset-btn')) $('clear-dataset-btn').classList.remove('hidden');
   
   $('c-total').innerText = STATE.stats.total;
   $('c-high').innerText = STATE.stats.high;
@@ -441,3 +456,16 @@ function viewPatient(id) {
   
   navigate('advisor');
 }
+
+window.handleClearDataset = function() {
+  STATE.dataset = null;
+  STATE.filteredDataset = null;
+  STATE.columns = [];
+  if ($('cohort-drop')) $('cohort-drop').classList.remove('hidden');
+  if ($('clear-dataset-btn')) $('clear-dataset-btn').classList.add('hidden');
+  if ($('analytics-dashboard')) $('analytics-dashboard').classList.add('hidden');
+  if ($('cohort-content')) $('cohort-content').classList.add('hidden');
+  if ($('upload-error')) $('upload-error').classList.add('hidden');
+  if ($('upload-status')) $('upload-status').classList.add('hidden');
+  if ($('csv-upload')) $('csv-upload').value = '';
+};

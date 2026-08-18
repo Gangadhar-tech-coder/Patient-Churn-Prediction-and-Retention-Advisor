@@ -170,9 +170,11 @@ async function handleFileUpload(e) {
 // Cohort View
 function renderCohortView() {
   if (!STATE.dataset) {
-    $('cohort-content').innerHTML = '<p style="padding:40px; text-align:center;">No data available. Please upload a dataset from the Home view.</p>';
+    $('cohort-content').classList.add('hidden');
+    // Don't show anything, or we could add a cohort-empty div
     return;
   }
+  $('cohort-content').classList.remove('hidden');
   
   $('c-total').innerText = STATE.stats.total;
   $('c-high').innerText = STATE.stats.high;

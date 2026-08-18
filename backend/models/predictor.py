@@ -6,6 +6,7 @@ import os
 import joblib
 import numpy as np
 import pandas as pd
+import shap
 from typing import Dict, List, Tuple
 
 from schemas.patient import (
@@ -231,20 +232,31 @@ class ChurnPredictor:
 
         return results
 
-    @staticmethod
-    def compute_feature_contributions(patient: PatientInput) -> List[FeatureContribution]:
-        """Compute relative risk contributions."""
-        vals = {
-            "Days Since Last Visit": min(patient.days_since_last_visit / 730, 1),
-            "Low Satisfaction": 1 - min((patient.overall_satisfaction - 1) / 4, 1),
-            "Distance (miles)": min(patient.distance_to_facility / 50, 1),
-            "High Out-of-Pocket": min(patient.avg_out_of_pocket_cost / 1999, 1),
-            "Short Tenure": 1 - min(patient.tenure_months / 120, 1),
-            "Missed Appointments": min(patient.missed_appointments / 8, 1),
-        }
+    def compute_feature_contributions(self, patient: PatientInput) -> List[FeatureContribution]:
+        """Compute relative risk contributions using SHAP."""
+        df = self._build_dataframe(patient)
+        feature_cols = [
+        "Age", "Tenure_Months", "Visits_Last_Year", "Missed_Appointments",
+        "Days_Since_Last_Visit", "Overall_Satisfaction", "Wait_Time_Satisfaction",
+        "Staff_Satisfaction", "Provider_Rating", "Avg_Out_Of_Pocket_Cost",
+        "Billing_Issues", "Portal_Usage", "Referrals_Made",
+        "Distance_To_Facility_Miles", "Engagement_Score", "Cost_Per_Visit",
+        "Satisfaction_Avg", "Gender", "State", "Specialty", "Insurance_Type"
+        ]
+        X_encoded = pd.get_dummies(df[feature_cols]).reindex(columns=self.columns, fill_value=0)
+        
+        explainer = shap.TreeExplainer(self.churn_model)
+        shap_values = explainer.shap_values(X_encoded)
+        
+        # Get absolute shap values to find the top drivers
+        shap_dict = dict(zip(self.columns, shap_values[0]))
+        
+        # We'll return the top 6 contributing factors
+        sorted_shap = sorted(shap_dict.items(), key=lambda x: abs(x[1]), reverse=True)[:6]
+        
         return [
-            FeatureContribution(factor=k, risk_impact=round(v, 4))
-            for k, v in sorted(vals.items(), key=lambda x: x[1])
+        FeatureContribution(factor=k.replace('_', ' ').title(), risk_impact=round(float(v), 4))
+        for k, v in sorted_shap
         ]
 
     @staticmethod

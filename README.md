@@ -23,21 +23,14 @@ An end-to-end Machine Learning web application for predicting patient churn risk
 
 ## Running the Application
 
-### 1. Backend (FastAPI)
+### Run the application
 
 ```bash
 cd backend
 pip install -r requirements.txt
-python train_model.py # (Already trained and artifacts saved)
-uvicorn main:app --reload --port 8000
+python -m uvicorn main:app --reload --port 8000
 ```
 
-### 2. Frontend (React)
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Access the frontend app at **http://localhost:5173**
+The FastAPI server serves the frontend and API together. Access the application at
+**http://localhost:8000**. The trained model artifacts are already included in
+`backend/ml_model`; run `python train_model.py` only when retraining is needed.

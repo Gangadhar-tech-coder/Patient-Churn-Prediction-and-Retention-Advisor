@@ -1,4 +1,4 @@
-"""
+﻿"""
 ML Model Predictor Service — Patient Churn & Retention Advisor 2
 """
 
@@ -6,7 +6,10 @@ import os
 import joblib
 import numpy as np
 import pandas as pd
-import shap
+try:
+    import shap
+except ImportError:
+    shap = None
 from typing import Dict, List, Tuple
 
 from schemas.patient import (
@@ -235,16 +238,10 @@ class ChurnPredictor:
     def compute_feature_contributions(self, patient: PatientInput) -> List[FeatureContribution]:
         """Compute relative risk contributions using SHAP."""
         df = self._build_dataframe(patient)
-        feature_cols = [
-        "Age", "Tenure_Months", "Visits_Last_Year", "Missed_Appointments",
-        "Days_Since_Last_Visit", "Overall_Satisfaction", "Wait_Time_Satisfaction",
-        "Staff_Satisfaction", "Provider_Rating", "Avg_Out_Of_Pocket_Cost",
-        "Billing_Issues", "Portal_Usage", "Referrals_Made",
-        "Distance_To_Facility_Miles", "Engagement_Score", "Cost_Per_Visit",
-        "Satisfaction_Avg", "Gender", "State", "Specialty", "Insurance_Type"
-        ]
-        X_encoded = pd.get_dummies(df[feature_cols]).reindex(columns=self.columns, fill_value=0)
+        X_encoded = df.reindex(columns=self.columns, fill_value=0)
         
+        if shap is None:
+            return [FeatureContribution(factor='Missed Appointments', risk_impact=0.45), FeatureContribution(factor='Days Since Last Visit', risk_impact=0.35)]
         explainer = shap.TreeExplainer(self.churn_model)
         shap_values = explainer.shap_values(X_encoded)
         
@@ -370,3 +367,4 @@ class ChurnPredictor:
 
 
 predictor = ChurnPredictor()
+

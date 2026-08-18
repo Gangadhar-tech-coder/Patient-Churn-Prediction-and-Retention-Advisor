@@ -1,3 +1,12 @@
+﻿const getApiUrl = (endpoint) => {
+  if (window.location.origin.includes('localhost:8000') || window.location.origin.includes('127.0.0.1:8000')) {
+    return endpoint;
+  }
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:') {
+    return 'http://localhost:8000' + endpoint;
+  }
+  return endpoint;
+};
 const $ = id => document.getElementById(id);
 const tokenKey = "patient_churn_token";
 
@@ -11,7 +20,6 @@ let STATE = {
   currentFilter: 'all',
   searchQuery: ''
 };
-
 let charts = {};
 
 // On Load
@@ -19,7 +27,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const token = localStorage.getItem(tokenKey);
   if (token) {
     try {
-      const res = await fetch('/api/auth/me', {
+      const res = await fetch(getApiUrl('/api/auth/me'), {
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (res.ok) {
@@ -146,7 +154,7 @@ async function handleFileUpload(e) {
   fd.append("file", file);
   
   try {
-    const res = await fetch("/api/batch-predict", {
+    const res = await fetch(getApiUrl("/api/batch-predict"), {
       method: "POST",
       headers: { "Authorization": `Bearer ${localStorage.getItem(tokenKey)}` },
       body: fd
@@ -469,3 +477,4 @@ window.handleClearDataset = function() {
   if ($('upload-status')) $('upload-status').classList.add('hidden');
   if ($('csv-upload')) $('csv-upload').value = '';
 };
+

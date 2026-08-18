@@ -1,4 +1,4 @@
-"""
+﻿"""
 Patient Churn Prediction — FastAPI Server
 ==========================================
 Run: uvicorn main:app --reload --port 8000
@@ -7,6 +7,9 @@ Run: uvicorn main:app --reload --port 8000
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+import os
 
 from models.predictor import predictor
 from routes.predict import router as predict_router
@@ -41,12 +44,21 @@ app.add_middleware(
 app.include_router(predict_router)
 app.include_router(auth_router)
 
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-import os
+frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend"))
+static_dir = os.path.join(os.path.dirname(__file__), "static")
 
-app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
+# Mount frontend directory for direct file access
+if os.path.exists(frontend_dir):
+    app.mount("/frontend", StaticFiles(directory=frontend_dir), name="frontend")
+elif os.path.exists(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 @app.get("/")
 async def serve_index():
-    return FileResponse(os.path.join(os.path.dirname(__file__), "static", "index.html"))
+    index_file = os.path.join(frontend_dir, "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
+    fallback_static = os.path.join(static_dir, "index.html")
+    if os.path.exists(fallback_static):
+        return FileResponse(fallback_static)
+    return {"message": "Patient Churn Prediction API is running"}

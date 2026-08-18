@@ -183,20 +183,10 @@ def get_user_analytics(user_id: str) -> dict:
         cohorts = db.query(CohortDataset).filter(CohortDataset.user_id == user_id)\
                     .order_by(CohortDataset.created_at.desc()).limit(10).all()
 
-        if not preds:
-            return {
-                "total_evaluated": 0,
-                "avg_churn": 0,
-                "high_risk_count": 0,
-                "medium_risk_count": 0,
-                "low_risk_count": 0,
-                "cohort_uploads": [],
-            }
-
-        probabilities = [p.probability for p in preds]
+        probabilities = [p.probability for p in preds] if preds else []
         return {
             "total_evaluated": len(preds),
-            "avg_churn": round(sum(probabilities) / len(probabilities) * 100, 1),
+            "avg_churn": round(sum(probabilities) / len(probabilities) * 100, 1) if probabilities else 0,
             "high_risk_count": sum(1 for p in preds if p.risk_level == "High"),
             "medium_risk_count": sum(1 for p in preds if p.risk_level == "Medium"),
             "low_risk_count": sum(1 for p in preds if p.risk_level == "Low"),

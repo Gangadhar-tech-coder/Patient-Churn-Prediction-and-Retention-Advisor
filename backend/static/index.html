@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Patient Churn & Retention Advisor</title>
-  <link rel="stylesheet" href="/static/style.css?v=3" />
+  <link rel="stylesheet" href="/static/style.css?v=4" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -216,31 +216,47 @@
                 <div class="cs-card low"><span class="cs-label">LOW RISK</span><span class="cs-val" id="c-low">0</span></div>
               </div>
 
-              <div class="charts-row">
-                <div class="chart-card">
-                  <h3>Risk Proportion</h3>
-                  <div style="height:250px;"><canvas id="riskPieChart"></canvas></div>
-                </div>
-                <div class="chart-card">
-                  <h3>Churn Probability Distribution</h3>
-                  <div style="height:250px;"><canvas id="probHistogramChart"></canvas></div>
-                </div>
-              </div>
+          <div class="charts-row">
+            <div class="chart-card">
+              <h3>Patient Risk Distribution</h3>
+              <div class="bar-chart" id="patient-risk-bars"></div>
+            </div>
+            <div class="chart-card">
+              <h3>Churn Probability Distribution</h3>
+              <div class="histogram" id="prob-histogram"></div>
+            </div>
+          </div>
 
-              <div class="filter-pills" style="display:flex; justify-content:space-between; align-items:center;">
-                <div>
-                  <h3>Patients Cohort List</h3>
-                  <div class="pills-row" style="margin-top:10px;">
-                    <button class="pill active" id="pill-all" onclick="filterCohort('all')">All</button>
-                    <button class="pill" id="pill-high" onclick="filterCohort('high')">High Risk</button>
-                    <button class="pill" id="pill-medium" onclick="filterCohort('medium')">Medium Risk</button>
-                    <button class="pill" id="pill-low" onclick="filterCohort('low')">Low Risk</button>
-                  </div>
-                </div>
-                <div style="display:flex; gap:10px; align-items:center;">
-                   <input type="text" id="cohort-search" placeholder="Search Patient ID..." onkeyup="filterCohortSearch(event)" style="padding:8px 12px; border-radius:6px; border:1px solid #ccc; min-width:250px;"/>
-                </div>
+          <div class="chart-card" style="margin-top: 20px;">
+            <h3>Risk Proportion</h3>
+            <div class="risk-pie" id="risk-pie-container"></div>
+          </div>
+
+          <div class="filter-pills" style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <h3>Patients Cohort List</h3>
+              <div class="pills-row" style="margin-top:10px;">
+                <button class="pill active" id="pill-all" onclick="filterCohort('all')">All</button>
+                <button class="pill" id="pill-high" onclick="filterCohort('high')">High Risk</button>
+                <button class="pill" id="pill-medium" onclick="filterCohort('medium')">Medium Risk</button>
+                <button class="pill" id="pill-low" onclick="filterCohort('low')">Low Risk</button>
               </div>
+            </div>
+            <div style="display:flex; gap:10px; align-items:center;">
+              <select id="cohort-gender-filter" onchange="filterCohortGender(this.value)" style="padding:8px 12px; border-radius:6px; border:1px solid #ccc;">
+                <option value="all">All Genders</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+              </select>
+              <select id="cohort-age-filter" onchange="filterCohortAge(this.value)" style="padding:8px 12px; border-radius:6px; border:1px solid #ccc;">
+                <option value="all">All Ages</option>
+                <option value="<30">&lt; 30</option>
+                <option value="30-50">30 - 50</option>
+                <option value=">50">&gt; 50</option>
+              </select>
+              <input type="text" id="cohort-search" placeholder="Search Patient ID..." onkeyup="filterCohortSearch(event)" style="padding:8px 12px; border-radius:6px; border:1px solid #ccc; min-width:250px;"/>
+            </div>
+          </div>
 
               <div class="cohort-table-wrap">
                 <table class="cohort-table" id="cohort-table">
@@ -321,6 +337,6 @@
       </div>
     </main>
   </div>
-  <script src="/static/app.js?v=3"></script>
+  <script src="/static/app.js?v=4"></script>
 </body>
 </html>

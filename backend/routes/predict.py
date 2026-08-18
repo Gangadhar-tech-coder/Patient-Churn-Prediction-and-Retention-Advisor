@@ -40,7 +40,7 @@ async def health_check():
     return HealthResponse(
         status="healthy" if predictor.is_loaded else "unhealthy",
         model_loaded=predictor.is_loaded,
-        model_type="Random Forest + Multi-Class Reason Classifier",
+        model_type="XGBoost + Multi-Class Reason Classifier",
         auc=0.6129,
     )
 

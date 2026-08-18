@@ -250,37 +250,72 @@ function applyFilters() {
     res = res.filter(r => String(r.patient_id).toLowerCase().includes(STATE.searchQuery));
   }
   STATE.filteredDataset = res;
+  STATE.currentPage = 1;
   renderTable();
 }
+
+const PAGE_SIZE = 15;
 
 function renderTable() {
   const head = $('cohort-table-head');
   const body = $('cohort-table-body');
-  
+
   let headHtml = '<tr>';
   STATE.columns.forEach(c => headHtml += `<th>${c}</th>`);
   headHtml += '<th>Churn Probability</th><th>Prediction</th><th>Risk Level</th><th>Main Risk Factor</th></tr>';
   head.innerHTML = headHtml;
-  
+
+  const totalPages = Math.ceil(STATE.filteredDataset.length / PAGE_SIZE) || 1;
+  const paginatedResults = STATE.filteredDataset.slice(
+    (STATE.currentPage - 1) * PAGE_SIZE,
+    STATE.currentPage * PAGE_SIZE
+  );
+
   let bodyHtml = '';
-  STATE.filteredDataset.forEach((r, i) => {
+  paginatedResults.forEach((r, i) => {
     let rowCls = `row-${r.risk_level.toLowerCase()}`;
     let prob = `<td style="font-weight:bold;">${r.percentage}%</td>`;
     let pred = `<td>${r.percentage >= 50 ? 'Likely to Churn' : 'Likely Retained'}</td>`;
     let risk = `<td><span class="risk-tag ${r.risk_level.toLowerCase()}">${r.risk_level} RISK</span></td>`;
     let reason = `<td class="reason-cell">${r.primary_churn_reason}</td>`;
-    
+
     let attrHtml = '';
     STATE.columns.forEach(c => {
       let val = r.attributes ? r.attributes[c] : (r.patient_id || `P-${i}`);
       attrHtml += `<td>${val}</td>`;
     });
-    
+
     bodyHtml += `<tr class="hover-row ${rowCls}" onclick="viewPatient('${r.patient_id}')">
       ${attrHtml}${prob}${pred}${risk}${reason}
     </tr>`;
   });
   body.innerHTML = bodyHtml;
+
+  if (totalPages > 1) {
+    $('pagination-controls').classList.remove('hidden');
+    $('page-current').innerText = STATE.currentPage;
+    $('page-total').innerText = totalPages;
+    $('page-records').innerText = STATE.filteredDataset.length;
+    $('page-prev').disabled = STATE.currentPage === 1;
+    $('page-next').disabled = STATE.currentPage === totalPages;
+  } else {
+    $('pagination-controls').classList.add('hidden');
+  }
+}
+
+function prevPage() {
+  if (STATE.currentPage > 1) {
+    STATE.currentPage--;
+    renderTable();
+  }
+}
+
+function nextPage() {
+  const totalPages = Math.ceil(STATE.filteredDataset.length / PAGE_SIZE) || 1;
+  if (STATE.currentPage < totalPages) {
+    STATE.currentPage++;
+    renderTable();
+  }
 }
 
 // Advisor View

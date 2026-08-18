@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Patient Churn & Retention Advisor</title>
-  <link rel="stylesheet" href="/static/style.css?v=2" />
+  <link rel="stylesheet" href="/static/style.css?v=3" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -209,10 +209,10 @@
             <div id="upload-error" class="view-error hidden"></div>
 
             <div id="cohort-content" class="hidden">
-              <div class="cs-stats-row">
-                <div class="cs-card"><span class="cs-label">TOTAL PATIENTS</span><span class="cs-val" id="c-total">0</span></div>
+              <div class="cohort-summary">
+                <div class="cs-card total"><span class="cs-label">TOTAL PATIENTS</span><span class="cs-val" id="c-total">0</span></div>
                 <div class="cs-card high"><span class="cs-label">HIGH RISK</span><span class="cs-val" id="c-high">0</span></div>
-                <div class="cs-card warning"><span class="cs-label">MEDIUM RISK</span><span class="cs-val" id="c-med">0</span></div>
+                <div class="cs-card medium"><span class="cs-label">MEDIUM RISK</span><span class="cs-val" id="c-med">0</span></div>
                 <div class="cs-card low"><span class="cs-label">LOW RISK</span><span class="cs-val" id="c-low">0</span></div>
               </div>
 
@@ -247,6 +247,15 @@
                   <thead id="cohort-table-head"></thead>
                   <tbody id="cohort-table-body"></tbody>
                 </table>
+              </div>
+
+              <!-- Pagination Controls -->
+              <div id="pagination-controls" class="pagination-controls hidden">
+                <button class="page-btn" id="page-prev" onclick="prevPage()">Previous</button>
+                <span class="page-info">
+                  Page <strong id="page-current">1</strong> of <strong id="page-total">1</strong> (<span id="page-records">0</span> records)
+                </span>
+                <button class="page-btn" id="page-next" onclick="nextPage()">Next</button>
               </div>
             </div>
           </div>
@@ -312,6 +321,6 @@
       </div>
     </main>
   </div>
-  <script src="/static/app.js?v=2"></script>
+  <script src="/static/app.js?v=3"></script>
 </body>
 </html>

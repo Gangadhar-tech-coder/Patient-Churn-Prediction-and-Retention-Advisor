@@ -1,4 +1,4 @@
-﻿"""
+"""
 ML Model Predictor Service — Patient Churn & Retention Advisor 2
 """
 
@@ -6,10 +6,6 @@ import os
 import joblib
 import numpy as np
 import pandas as pd
-try:
-    import shap
-except ImportError:
-    shap = None
 from typing import Dict, List, Tuple
 
 from schemas.patient import (
@@ -235,26 +231,31 @@ class ChurnPredictor:
 
         return results
 
-    def compute_feature_contributions(self, patient: PatientInput) -> List[FeatureContribution]:
+    def compute_feature_contributions(self, df: pd.DataFrame) -> List[FeatureContribution]:
         """Compute relative risk contributions using SHAP."""
-        df = self._build_dataframe(patient)
-        X_encoded = df.reindex(columns=self.columns, fill_value=0)
+        import shap
         
-        if shap is None:
-            return [FeatureContribution(factor='Missed Appointments', risk_impact=0.45), FeatureContribution(factor='Days Since Last Visit', risk_impact=0.35)]
+        # XGBoost handles TreeExplainer natively and efficiently
         explainer = shap.TreeExplainer(self.churn_model)
-        shap_values = explainer.shap_values(X_encoded)
+        shap_values = explainer.shap_values(df)
         
-        # Get absolute shap values to find the top drivers
-        shap_dict = dict(zip(self.columns, shap_values[0]))
+        if len(shap_values.shape) > 1:
+            sv = shap_values[0]
+        else:
+            sv = shap_values
+            
+        feature_names = df.columns.tolist()
         
-        # We'll return the top 6 contributing factors
-        sorted_shap = sorted(shap_dict.items(), key=lambda x: abs(x[1]), reverse=True)[:6]
-        
-        return [
-        FeatureContribution(factor=k.replace('_', ' ').title(), risk_impact=round(float(v), 4))
-        for k, v in sorted_shap
-        ]
+        contributions = []
+        for name, val in zip(feature_names, sv):
+            if val != 0:
+                # humanize snake_case slightly
+                human_name = name.replace("_", " ").title()
+                contributions.append(FeatureContribution(factor=human_name, risk_impact=round(float(val), 4)))
+                
+        # Return top 6 by absolute impact magnitude
+        contributions = sorted(contributions, key=lambda x: abs(x.risk_impact), reverse=True)[:6]
+        return contributions
 
     @staticmethod
     def compute_interventions(patient: PatientInput) -> List[Intervention]:
@@ -361,10 +362,9 @@ class ChurnPredictor:
             "primary_churn_reason": primary_reason,
             "retention_advice": retention_advice,
             "metrics": self.compute_metrics(patient),
-            "feature_contributions": self.compute_feature_contributions(patient),
+            "feature_contributions": self.compute_feature_contributions(df),
             "interventions": self.compute_interventions(patient),
         }
 
 
 predictor = ChurnPredictor()
-

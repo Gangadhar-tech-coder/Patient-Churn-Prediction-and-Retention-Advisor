@@ -13,6 +13,8 @@ export default function CohortAnalysisView({ onNavigate }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState("all");
+  const [genderFilter, setGenderFilter] = useState("all");
+  const [ageFilter, setAgeFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedPatient, setSelectedPatient] = useState(null);
@@ -113,7 +115,27 @@ export default function CohortAnalysisView({ onNavigate }) {
     results?.results?.filter((r) => {
       const matchFilter = filter === "all" ? true : r.risk_level.toLowerCase() === filter;
       const matchSearch = searchTerm === "" ? true : (r.patient_id || `P-${r.index + 1}`).toLowerCase().includes(searchTerm.toLowerCase());
-      return matchFilter && matchSearch;
+      
+      let matchGender = true;
+      if (genderFilter !== "all" && r.attributes) {
+        const gKey = Object.keys(r.attributes).find(k => k.toLowerCase() === "gender");
+        if (gKey) {
+            matchGender = String(r.attributes[gKey]).toLowerCase() === genderFilter.toLowerCase();
+        }
+      }
+
+      let matchAge = true;
+      if (ageFilter !== "all" && r.attributes) {
+        const aKey = Object.keys(r.attributes).find(k => k.toLowerCase() === "age");
+        if (aKey) {
+            const ageVal = Number(r.attributes[aKey]);
+            if (ageFilter === "<30") matchAge = ageVal < 30;
+            else if (ageFilter === "30-50") matchAge = ageVal >= 30 && ageVal <= 50;
+            else if (ageFilter === ">50") matchAge = ageVal > 50;
+        }
+      }
+
+      return matchFilter && matchSearch && matchGender && matchAge;
     }) || [];
 
   // Pagination calculation
@@ -133,6 +155,11 @@ export default function CohortAnalysisView({ onNavigate }) {
     else histogram[4]++;
   });
   const histMax = Math.max(...histogram, 1);
+
+  // Extract dynamic columns from the uploaded dataset
+  const dynamicColumns = results?.results?.[0]?.attributes 
+    ? Object.keys(results.results[0].attributes) 
+    : ["Patient ID"];
 
   return (
     <div className="view-container" id="cohort-print-area">
@@ -376,7 +403,26 @@ export default function CohortAnalysisView({ onNavigate }) {
                 ))}
               </div>
             </div>
-            <div>
+            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+              <select 
+                value={genderFilter} 
+                onChange={(e) => { setGenderFilter(e.target.value); setCurrentPage(1); }}
+                style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #ccc" }}
+              >
+                <option value="all">All Genders</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+              </select>
+              <select 
+                value={ageFilter} 
+                onChange={(e) => { setAgeFilter(e.target.value); setCurrentPage(1); }}
+                style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #ccc" }}
+              >
+                <option value="all">All Ages</option>
+                <option value="<30">&lt; 30</option>
+                <option value="30-50">30 - 50</option>
+                <option value=">50">&gt; 50</option>
+              </select>
               <input
                 type="text"
                 placeholder="Search Patient ID..."
@@ -395,18 +441,31 @@ export default function CohortAnalysisView({ onNavigate }) {
             <table className="cohort-table">
               <thead>
                 <tr>
-                  <th>Patient ID</th>
+                  {dynamicColumns.map((col) => (
+                    <th key={col}>{col}</th>
+                  ))}
                   <th>Churn Probability</th>
                   <th>Prediction</th>
                   <th>Risk Level</th>
                   <th>Main Risk Factor</th>
-                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
                 {paginatedResults.map((r) => (
-                  <tr key={r.index}>
-                    <td className="mono">{r.patient_id || `P-${r.index + 1}`}</td>
+                  <tr 
+                    key={r.index}
+                    style={{ cursor: "pointer" }}
+                    onClick={() => {
+                        localStorage.setItem("selectedPatientDetails", JSON.stringify(r));
+                        onNavigate("advisor");
+                    }}
+                    className={`hover-row row-${r.risk_level.toLowerCase()}`}
+                  >
+                    {dynamicColumns.map((col) => (
+                      <td key={col} className={col.toLowerCase().includes("id") ? "mono" : ""}>
+                        {r.attributes ? r.attributes[col] : (r.patient_id || `P-${r.index + 1}`)}
+                      </td>
+                    ))}
                     <td>
                       <strong>{r.percentage}%</strong>
                     </td>
@@ -415,14 +474,6 @@ export default function CohortAnalysisView({ onNavigate }) {
                       <span className={`risk-tag ${r.risk_level.toLowerCase()}`}>{r.risk_level} RISK</span>
                     </td>
                     <td className="reason-cell">{r.primary_churn_reason}</td>
-                    <td>
-                      <button className="view-patient-btn" onClick={() => {
-                        localStorage.setItem("selectedPatientDetails", JSON.stringify(r));
-                        onNavigate("advisor");
-                      }}>
-                        View Details
-                      </button>
-                    </td>
                   </tr>
                 ))}
               </tbody>

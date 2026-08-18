@@ -1,8 +1,7 @@
 /* ═══════════════════════════════════════════════════
    Views — Shared Styles
    ═══════════════════════════════════════════════════ */
-
-.view-container { padding: 28px 32px; max-width: 1100px; }
+.view-container { padding: 28px 32px; max-width: 100%; }
 
 .view-header-row {
   display: flex;
@@ -261,8 +260,25 @@
   font-size: 12px; font-weight: 700; color: #64748b;
   border-bottom: 2px solid #e2e8f0; background: #f8fafc;
 }
-.cohort-table td { padding: 12px 16px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+.cohort-table td { 
+  padding: 8px 12px; 
+  border-bottom: 1px solid #f1f5f9; 
+  color: #334155;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
 .cohort-table tr:hover { background: #f8fafc; }
+
+.cohort-table tr.row-high { background-color: #fef2f2; }
+.cohort-table tr.row-high:hover { background-color: #fee2e2; }
+
+.cohort-table tr.row-medium { background-color: #fef9ec; }
+.cohort-table tr.row-medium:hover { background-color: #fef3c7; }
+
+.cohort-table tr.row-low { background-color: #f0fdf4; }
+.cohort-table tr.row-low:hover { background-color: #dcfce7; }
 .mono { font-family: "SF Mono", "Consolas", monospace; font-size: 12px; color: #64748b; }
 .risk-tag {
   display: inline-block; padding: 3px 10px; border-radius: 6px;

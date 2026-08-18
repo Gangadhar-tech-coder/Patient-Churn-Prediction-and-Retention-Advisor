@@ -31,7 +31,6 @@ export default function RetentionAdvisorView() {
           borderRadius: "8px",
           padding: "24px",
           boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
-          maxWidth: "800px",
           margin: "0 auto",
         }}
       >
@@ -215,13 +214,18 @@ export default function RetentionAdvisorView() {
         >
           Patient Profile Attributes
         </h3>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px" }}>
-          <AttributeCard label="AGE" value="N/A" />
-          <AttributeCard label="GENDER" value="N/A" />
-          <AttributeCard label="STATE" value="N/A" />
-          <AttributeCard label="SPECIALTY" value="N/A" />
-          <AttributeCard label="INSURANCE TYPE" value="N/A" />
-          <AttributeCard label="TENURE (MONTHS)" value="N/A" />
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "16px" }}>
+          {patient.attributes && Object.keys(patient.attributes).length > 0 ? (
+            Object.entries(patient.attributes).map(([key, val]) => (
+              <AttributeCard 
+                key={key} 
+                label={key.toUpperCase()} 
+                value={val !== null && val !== undefined ? val.toString() : "N/A"} 
+              />
+            ))
+          ) : (
+            <p>No profile attributes available.</p>
+          )}
         </div>
       </div>
     </div>

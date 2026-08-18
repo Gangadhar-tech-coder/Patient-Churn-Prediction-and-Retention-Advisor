@@ -99,6 +99,7 @@ class BatchPredictionRow(BaseModel):
     risk_level: str
     primary_churn_reason: str
     retention_advice: str
+    attributes: Optional[dict] = None
 
 
 class BatchPredictionResponse(BaseModel):

@@ -1,0 +1,326 @@
+import re
+
+html = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Patient Churn & Retention Advisor</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <!-- Login View -->
+  <div id="login-view" class="login-page-container hidden">
+    <div class="login-split">
+      <div class="login-left">
+        <div class="login-branding">
+          <div class="brand-logo">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg>
+          </div>
+          <h1>Patient Churn Prediction</h1>
+          <p>AI-Powered Retention Advisor</p>
+        </div>
+        <div class="login-illustration">
+          <div class="login-card-mockup mockup-1"></div>
+          <div class="login-card-mockup mockup-2"></div>
+        </div>
+      </div>
+      <div class="login-right">
+        <div class="login-form-container">
+          <h2>Welcome Back</h2>
+          <p id="login-subtitle">Sign in to access your clinical dashboard</p>
+          <div class="login-tabs">
+            <button type="button" id="tab-signin" class="login-tab active" onclick="setLoginMode('signin')">Sign In</button>
+            <button type="button" id="tab-signup" class="login-tab" onclick="setLoginMode('signup')">Create Account</button>
+          </div>
+          <form id="login-form" class="login-form" onsubmit="handleLoginSubmit(event)">
+            <div id="login-name-field" class="form-group hidden">
+              <label>Full Name</label>
+              <input id="login-name" type="text" placeholder="Dr. John Doe" />
+            </div>
+            <div class="form-group">
+              <label>Email Address</label>
+              <input id="login-email" type="email" placeholder="doctor@hospital.com" required />
+            </div>
+            <div class="form-group">
+              <label>Password</label>
+              <input id="login-password" type="password" placeholder="••••••••" required />
+            </div>
+            <div id="login-error" class="login-error hidden"></div>
+            <button type="submit" id="login-submit-btn" class="login-submit-btn">Sign In to Dashboard</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- App Layout -->
+  <div id="app-layout" class="app-layout hidden">
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <div class="logo-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg>
+        </div>
+        <div class="logo-text">
+          <span class="logo-title">Patient Churn</span>
+          <span class="logo-subtitle">Prediction</span>
+        </div>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="#" id="nav-home" class="nav-link active" onclick="navigate('home'); return false;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>
+          Home
+        </a>
+        <a href="#" id="nav-advisor" class="nav-link" onclick="navigate('advisor'); return false;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+          Retention Advisor
+        </a>
+        <a href="#" id="nav-cohort" class="nav-link" onclick="navigate('cohort'); return false;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18" /><path d="M18 17V9" /><path d="M13 17V5" /><path d="M8 17v-3" /></svg>
+          Cohort Analysis
+        </a>
+      </nav>
+      <div class="sidebar-user">
+        <div class="user-profile">
+          <div class="user-avatar" id="nav-user-initial">D</div>
+          <div class="user-info">
+            <span class="user-name" id="nav-user-name">Doctor</span>
+            <span class="user-email" id="nav-user-email">doctor@hospital.com</span>
+          </div>
+        </div>
+        <button class="sidebar-signout-btn" onclick="signout()" title="Sign Out">Sign Out</button>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="app-header-bar">
+        <div class="header-left">
+          <div class="header-brand">
+            <div class="header-brand-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2"><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg>
+            </div>
+            <div>
+              <span class="header-brand-name">Patient Churn Prediction</span>
+              <span class="header-brand-sub">Patient Retention Advisor</span>
+            </div>
+          </div>
+          <span class="health-badge" id="health-badge"><span class="health-dot"></span> Model Service Connected</span>
+        </div>
+        <div class="header-right">
+          <div class="header-user-welcome">
+            <span class="user-greeting" id="header-greeting">Welcome</span>
+          </div>
+        </div>
+      </header>
+
+      <div class="main-scroll">
+        <!-- HOME VIEW -->
+        <div id="view-home" class="view-section hidden">
+          <div class="view-container">
+            <div class="view-badge">Patient Retention Advisor</div>
+            <h1 class="view-title">Welcome to Patient Churn Prediction</h1>
+            <p class="view-subtitle-blue">Patient Retention & Risk Management Platform</p>
+            <p class="view-desc">Identify churn risk, understand patient needs, and take targeted retention actions.</p>
+
+            <div class="home-cards">
+              <div class="home-card">
+                <div class="home-card-icon" style="background: #eff6ff">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                  </svg>
+                </div>
+                <h3>Predict a Patient</h3>
+                <p>Enter individual patient details to predict churn risk and receive a personalized retention recommendation.</p>
+                <button class="home-card-btn primary" onclick="navigate('advisor')">Predict Patient</button>
+              </div>
+
+              <div class="home-card">
+                <div class="home-card-icon" style="background: #f0fdf4">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2">
+                    <line x1="18" y1="20" x2="18" y2="10" />
+                    <line x1="12" y1="20" x2="12" y2="4" />
+                    <line x1="6" y1="20" x2="6" y2="14" />
+                  </svg>
+                </div>
+                <h3>Analyze Patient Dataset</h3>
+                <p>Upload a CSV or Excel dataset to evaluate churn risk across multiple patients, identify at-risk patients, and prioritize retention actions.</p>
+                <button class="home-card-btn outline" onclick="navigate('cohort')">Upload Dataset</button>
+              </div>
+            </div>
+
+            <div class="how-it-works">
+              <h4>HOW PATIENT CHURN PREDICTION WORKS</h4>
+              <div class="steps-row">
+                <div class="step-item">
+                  <div class="step-box"><span class="step-num">STEP 1</span><span class="step-label">Enter Patient Data</span></div>
+                </div>
+                <div class="step-item"><span class="step-arrow">&rarr;</span>
+                  <div class="step-box"><span class="step-num">STEP 2</span><span class="step-label">Predict Churn Risk</span></div>
+                </div>
+                <div class="step-item"><span class="step-arrow">&rarr;</span>
+                  <div class="step-box"><span class="step-num">STEP 3</span><span class="step-label">Get Retention Advice</span></div>
+                </div>
+                <div class="step-item"><span class="step-arrow">&rarr;</span>
+                  <div class="step-box"><span class="step-num">STEP 4</span><span class="step-label">Take Action</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div id="analytics-dashboard" class="hidden" style="margin-top:40px; border-top:1px solid #e5e7eb; padding-top:40px;">
+              <h2 class="view-title" style="font-size:24px;">My Analytics Dashboard</h2>
+              <p class="view-desc" style="margin-bottom:24px;">Track your patient prediction history, cohort uploads, and risk distribution metrics.</p>
+
+              <div class="analytics-cards">
+                <div class="an-card"><span class="an-val" id="an-total">0</span><span class="an-label">Total Evaluated</span></div>
+                <div class="an-card"><span class="an-val" id="an-avg-risk">0%</span><span class="an-label">Avg Churn Risk</span></div>
+                <div class="an-card danger"><span class="an-val" id="an-high">0</span><span class="an-label">High Risk</span></div>
+                <div class="an-card warning"><span class="an-val" id="an-med">0</span><span class="an-label">Medium Risk</span></div>
+                <div class="an-card success"><span class="an-val" id="an-low">0</span><span class="an-label">Low Risk</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- COHORT VIEW -->
+        <div id="view-cohort" class="view-section hidden">
+          <div class="view-container" id="cohort-print-area">
+            <div class="view-header-row">
+              <div>
+                <h1 class="view-title">Analyze Patient Cohort</h1>
+                <p class="view-desc">Upload a patient CSV or Excel file to evaluate churn risk across multiple patients and prioritize retention actions.</p>
+              </div>
+              <button id="clear-dataset-btn" class="clear-dataset-btn hidden" onclick="handleClearDataset()">Clear Dataset & Upload New</button>
+            </div>
+
+            <div id="cohort-drop" class="cohort-drop" onclick="document.getElementById('csv-upload').click()">
+              <input type="file" id="csv-upload" accept=".csv" class="hidden" onchange="handleFileUpload(event)" />
+              <div class="drop-icon-box">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+              </div>
+              <p><strong>Drag & drop your patient CSV or Excel file here</strong></p>
+              <p class="drop-hint">or click to browse from your device</p>
+              <button type="button" class="browse-btn" onclick="event.stopPropagation(); document.getElementById('csv-upload').click()">Browse Files</button>
+              <p class="drop-hint">Supported formats: CSV, Excel (.xlsx, .xls)</p>
+            </div>
+
+            <div id="upload-status" class="upload-status hidden" style="text-align:center; padding:20px; font-weight:bold;">Uploading and processing...</div>
+            <div id="upload-error" class="view-error hidden"></div>
+
+            <div id="cohort-content" class="hidden">
+              <div class="cs-stats-row">
+                <div class="cs-card"><span class="cs-label">TOTAL PATIENTS</span><span class="cs-val" id="c-total">0</span></div>
+                <div class="cs-card high"><span class="cs-label">HIGH RISK</span><span class="cs-val" id="c-high">0</span></div>
+                <div class="cs-card warning"><span class="cs-label">MEDIUM RISK</span><span class="cs-val" id="c-med">0</span></div>
+                <div class="cs-card low"><span class="cs-label">LOW RISK</span><span class="cs-val" id="c-low">0</span></div>
+              </div>
+
+              <div class="charts-row">
+                <div class="chart-card">
+                  <h3>Risk Proportion</h3>
+                  <div style="height:250px;"><canvas id="riskPieChart"></canvas></div>
+                </div>
+                <div class="chart-card">
+                  <h3>Churn Probability Distribution</h3>
+                  <div style="height:250px;"><canvas id="probHistogramChart"></canvas></div>
+                </div>
+              </div>
+
+              <div class="filter-pills" style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                  <h3>Patients Cohort List</h3>
+                  <div class="pills-row" style="margin-top:10px;">
+                    <button class="pill active" id="pill-all" onclick="filterCohort('all')">All</button>
+                    <button class="pill" id="pill-high" onclick="filterCohort('high')">High Risk</button>
+                    <button class="pill" id="pill-medium" onclick="filterCohort('medium')">Medium Risk</button>
+                    <button class="pill" id="pill-low" onclick="filterCohort('low')">Low Risk</button>
+                  </div>
+                </div>
+                <div style="display:flex; gap:10px; align-items:center;">
+                   <input type="text" id="cohort-search" placeholder="Search Patient ID..." onkeyup="filterCohortSearch(event)" style="padding:8px 12px; border-radius:6px; border:1px solid #ccc; min-width:250px;"/>
+                </div>
+              </div>
+
+              <div class="cohort-table-wrap">
+                <table class="cohort-table" id="cohort-table">
+                  <thead id="cohort-table-head"></thead>
+                  <tbody id="cohort-table-body"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ADVISOR VIEW -->
+        <div id="view-advisor" class="view-section hidden">
+          <div class="view-container">
+            <button class="back-btn" onclick="navigate('cohort')" style="background:none;border:none;color:#2563eb;cursor:pointer;font-weight:600;margin-bottom:20px;padding:0;">&larr; Back to Cohort</button>
+            
+            <div id="adv-empty" class="hidden">
+              <h1 class="view-title">Retention Advisor</h1>
+              <p class="view-desc">No patient selected. Please navigate to Cohort Analysis, upload a dataset, and click on a patient.</p>
+            </div>
+
+            <div id="adv-card" class="patient-details-card hidden" style="background:#fff;border-radius:8px;padding:24px;box-shadow:0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);margin:0 auto;">
+              <!-- Header -->
+              <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e5e7eb;padding-bottom:16px;margin-bottom:24px;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                  <div style="background:#2563eb;color:white;width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:24px;" id="adv-icon">P</div>
+                  <div>
+                    <h2 style="margin:0;fontSize:22px;color:#111827;">Patient Details — <span id="adv-patient-id"></span></h2>
+                    <p style="margin:0;fontSize:14px;color:#6b7280;">Comprehensive Profile & Churn Assessment</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Top Cards -->
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;background:#f8fafc;padding:20px;border-radius:8px;margin-bottom:16px;">
+                <div>
+                  <div style="font-size:12px;font-weight:bold;color:#64748b;letter-spacing:0.5px;margin-bottom:8px;">CHURN PROBABILITY</div>
+                  <div style="font-size:28px;font-weight:bold;color:#2563eb;" id="adv-prob">0%</div>
+                </div>
+                <div>
+                  <div style="font-size:12px;font-weight:bold;color:#64748b;letter-spacing:0.5px;margin-bottom:8px;">RISK TIER</div>
+                  <div><span id="adv-risk-tag" style="color:white;padding:6px 12px;border-radius:6px;font-size:14px;font-weight:bold;">Risk</span></div>
+                </div>
+                <div>
+                  <div style="font-size:12px;font-weight:bold;color:#64748b;letter-spacing:0.5px;margin-bottom:8px;">PREDICTION STATUS</div>
+                  <div style="font-size:18px;font-weight:bold;color:#111827;" id="adv-status">Status</div>
+                </div>
+              </div>
+
+              <!-- Primary Reason -->
+              <div style="background:#fef9c3;border:1px solid #fde047;padding:20px;border-radius:8px;margin-bottom:16px;">
+                <div style="font-size:12px;font-weight:bold;color:#854d0e;letter-spacing:0.5px;margin-bottom:8px;">PRIMARY CHURN REASON</div>
+                <div style="font-size:16px;color:#111827;" id="adv-reason">Reason</div>
+              </div>
+
+              <!-- Retention Advice -->
+              <div style="background:#eff6ff;border:1px solid #bfdbfe;padding:20px;border-radius:8px;margin-bottom:32px;">
+                <div style="font-size:12px;font-weight:bold;color:#1e40af;letter-spacing:0.5px;margin-bottom:8px;">RECOMMENDED RETENTION ADVICE</div>
+                <div style="font-size:18px;color:#1e3a8a;line-height:1.6;" id="adv-advice">Advice</div>
+              </div>
+
+              <h3 style="font-size:18px;margin-bottom:16px;color:#111827;font-weight:bold;">Patient Profile Attributes</h3>
+              <div id="adv-attributes" style="display:grid;grid-template-columns:repeat(7, 1fr);gap:16px;">
+                <!-- dynamic attributes -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>
+"""
+with open("/home/pavana/Patient-Churn-Prediction-and-Retention-Advisor/backend/static/index.html", "w") as f:
+    f.write(html)

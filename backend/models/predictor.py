@@ -88,9 +88,9 @@ class ChurnPredictor:
     @staticmethod
     def _classify_risk(probability: float) -> Tuple[str, str]:
         """Classify into High / Medium / Low risk tier."""
-        if probability >= 0.65:
+        if probability >= 0.75:
             return "High", "risk-high"
-        elif probability >= 0.45:
+        elif probability >= 0.50:
             return "Medium", "risk-medium"
         else:
             return "Low", "risk-low"
@@ -99,7 +99,7 @@ class ChurnPredictor:
         self, df_input: pd.DataFrame, patient: PatientInput, probability: float
     ) -> Tuple[str, str]:
         """Predict primary churn reason and map retention advice."""
-        if probability < 0.45:
+        if probability < 0.50:
             reason = "Not currently at risk (satisfied / engaged patient)"
         else:
             if patient.missed_appointments >= 3:
@@ -134,9 +134,23 @@ class ChurnPredictor:
         )
         return reason, advice
 
-    def predict_batch(self, df_raw: pd.DataFrame) -> List[Dict]:
+    def predict_batch(self, df_raw: pd.DataFrame, df_original: pd.DataFrame = None) -> List[Dict]:
         """Fast vectorized batch prediction for entire cohort at once."""
         df = df_raw.copy()
+
+        # Auto-fill missing columns (medians/modes)
+        defaults = {
+            "Age": 65, "Tenure_Months": 36, "Visits_Last_Year": 2, "Missed_Appointments": 0,
+            "Days_Since_Last_Visit": 90, "Overall_Satisfaction": 3.5, "Wait_Time_Satisfaction": 3.5,
+            "Staff_Satisfaction": 3.5, "Provider_Rating": 3.5, "Avg_Out_Of_Pocket_Cost": 500,
+            "Billing_Issues": 0, "Portal_Usage": 1, "Referrals_Made": 0,
+            "Distance_To_Facility_Miles": 15.0, "Gender": "Unknown", "State": "Unknown",
+            "Specialty": "Primary Care", "Insurance_Type": "Unknown"
+        }
+        for col, val in defaults.items():
+            if col not in df.columns:
+                df[col] = val
+        df.fillna(defaults, inplace=True)
 
         df["Engagement_Score"] = df["Visits_Last_Year"] - df["Missed_Appointments"]
         df["Cost_Per_Visit"] = df["Avg_Out_Of_Pocket_Cost"] / (df["Visits_Last_Year"] + 1)
@@ -167,7 +181,7 @@ class ChurnPredictor:
             pct = round(prob * 100, 1)
             risk_level, _ = self._classify_risk(prob)
 
-            if prob < 0.45:
+            if prob < 0.50:
                 reason = "Not currently at risk (satisfied / engaged patient)"
             else:
                 if row.get("Missed_Appointments", 0) >= 3:
@@ -201,6 +215,8 @@ class ChurnPredictor:
             )
 
             patient_id = str(row["PatientID"]) if "PatientID" in row else f"P-{idx+1}"
+            
+            orig_row = df_original.iloc[idx] if df_original is not None else row
 
             results.append({
                 "index": idx,
@@ -210,25 +226,36 @@ class ChurnPredictor:
                 "risk_level": risk_level,
                 "primary_churn_reason": reason,
                 "retention_advice": advice,
+                "attributes": orig_row.to_dict(),
             })
 
         return results
 
-    @staticmethod
-    def compute_feature_contributions(patient: PatientInput) -> List[FeatureContribution]:
-        """Compute relative risk contributions."""
-        vals = {
-            "Days Since Last Visit": min(patient.days_since_last_visit / 730, 1),
-            "Low Satisfaction": 1 - min((patient.overall_satisfaction - 1) / 4, 1),
-            "Distance (miles)": min(patient.distance_to_facility / 50, 1),
-            "High Out-of-Pocket": min(patient.avg_out_of_pocket_cost / 1999, 1),
-            "Short Tenure": 1 - min(patient.tenure_months / 120, 1),
-            "Missed Appointments": min(patient.missed_appointments / 8, 1),
-        }
-        return [
-            FeatureContribution(factor=k, risk_impact=round(v, 4))
-            for k, v in sorted(vals.items(), key=lambda x: x[1])
-        ]
+    def compute_feature_contributions(self, df: pd.DataFrame) -> List[FeatureContribution]:
+        """Compute relative risk contributions using SHAP."""
+        import shap
+        
+        # XGBoost handles TreeExplainer natively and efficiently
+        explainer = shap.TreeExplainer(self.churn_model)
+        shap_values = explainer.shap_values(df)
+        
+        if len(shap_values.shape) > 1:
+            sv = shap_values[0]
+        else:
+            sv = shap_values
+            
+        feature_names = df.columns.tolist()
+        
+        contributions = []
+        for name, val in zip(feature_names, sv):
+            if val != 0:
+                # humanize snake_case slightly
+                human_name = name.replace("_", " ").title()
+                contributions.append(FeatureContribution(factor=human_name, risk_impact=round(float(val), 4)))
+                
+        # Return top 6 by absolute impact magnitude
+        contributions = sorted(contributions, key=lambda x: abs(x.risk_impact), reverse=True)[:6]
+        return contributions
 
     @staticmethod
     def compute_interventions(patient: PatientInput) -> List[Intervention]:
@@ -237,7 +264,7 @@ class ChurnPredictor:
         if patient.days_since_last_visit > 180:
             items.append(
                 Intervention(
-                    icon="📞",
+                    icon="Outreach",
                     text="Schedule proactive outreach call",
                     priority="high",
                 )
@@ -245,13 +272,13 @@ class ChurnPredictor:
         if patient.overall_satisfaction < 2.5:
             items.append(
                 Intervention(
-                    icon="🎧", text="Assign patient advocate", priority="high"
+                    icon="Advocate", text="Assign patient advocate", priority="high"
                 )
             )
         if patient.billing_issues == 1:
             items.append(
                 Intervention(
-                    icon="💰",
+                    icon="Counseling",
                     text="Connect with financial counseling",
                     priority="high",
                 )
@@ -259,13 +286,13 @@ class ChurnPredictor:
         if patient.missed_appointments > 3:
             items.append(
                 Intervention(
-                    icon="📱", text="Offer telehealth options", priority="high"
+                    icon="Telehealth", text="Offer telehealth options", priority="high"
                 )
             )
         if patient.portal_usage == 0:
             items.append(
                 Intervention(
-                    icon="🖥️",
+                    icon="Portal",
                     text="Promote patient portal enrollment",
                     priority="medium",
                 )
@@ -273,7 +300,7 @@ class ChurnPredictor:
         if patient.distance_to_facility > 25:
             items.append(
                 Intervention(
-                    icon="🚗",
+                    icon="Location",
                     text="Suggest closer satellite facility",
                     priority="medium",
                 )
@@ -281,7 +308,7 @@ class ChurnPredictor:
         if patient.visits_last_year < 2:
             items.append(
                 Intervention(
-                    icon="📅",
+                    icon="Reminders",
                     text="Send preventive care reminders",
                     priority="medium",
                 )
@@ -289,7 +316,7 @@ class ChurnPredictor:
         if not items:
             items.append(
                 Intervention(
-                    icon="✅",
+                    icon="Standard",
                     text="Continue standard engagement protocols",
                     priority="low",
                 )
@@ -335,7 +362,7 @@ class ChurnPredictor:
             "primary_churn_reason": primary_reason,
             "retention_advice": retention_advice,
             "metrics": self.compute_metrics(patient),
-            "feature_contributions": self.compute_feature_contributions(patient),
+            "feature_contributions": self.compute_feature_contributions(df),
             "interventions": self.compute_interventions(patient),
         }
 

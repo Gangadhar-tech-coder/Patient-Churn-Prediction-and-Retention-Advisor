@@ -244,6 +244,11 @@ class ChurnPredictor:
             return [FeatureContribution(factor='Missed Appointments', risk_impact=0.45), FeatureContribution(factor='Days Since Last Visit', risk_impact=0.35)]
         explainer = shap.TreeExplainer(self.churn_model)
         shap_values = explainer.shap_values(X_encoded)
+        if isinstance(shap_values, list):
+            shap_values = shap_values[0]
+        if hasattr(shap_values, "to_numpy"):
+            shap_values = shap_values.to_numpy()
+        shap_values = np.asarray(shap_values)
         
         # Get absolute shap values to find the top drivers
         shap_dict = dict(zip(self.columns, shap_values[0]))

@@ -1,0 +1,220 @@
+const API_BASE = '';
+const TOKEN_KEY = 'patient_churn_token';
+
+const api = (path, options = {}) => fetch(`${API_BASE}${path}`, {
+  ...options,
+  headers: {
+    ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
+    ...(options.headers || {}),
+    Authorization: `Bearer ${localStorage.getItem(TOKEN_KEY) || ''}`
+  }
+});
+
+const page = document.body.dataset.page;
+const $ = (selector) => document.querySelector(selector);
+const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
+let cohortRows = [];
+
+function redirectToLogin() {
+  window.location.href = '/frontend/login.html';
+}
+
+function redirectToDashboard() {
+  window.location.href = '/frontend/dashboard.html';
+}
+
+async function requireAuth() {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) {
+    redirectToLogin();
+    return null;
+  }
+  try {
+    const response = await api('/api/auth/me');
+    if (!response.ok) throw new Error('Session expired');
+    const data = await response.json();
+    document.querySelectorAll('[data-user-name]').forEach((node) => { node.textContent = data.user.name; });
+    document.querySelectorAll('[data-user-email]').forEach((node) => { node.textContent = data.user.email; });
+    document.querySelectorAll('[data-user-initial]').forEach((node) => { node.textContent = data.user.name.charAt(0).toUpperCase(); });
+    return data.user;
+  } catch (error) {
+    localStorage.removeItem(TOKEN_KEY);
+    redirectToLogin();
+    return null;
+  }
+}
+
+async function signout() {
+  try { await api('/api/auth/signout', { method: 'POST' }); } catch (error) { /* local session is still cleared */ }
+  localStorage.removeItem(TOKEN_KEY);
+  redirectToLogin();
+}
+
+function setLoginMode(mode) {
+  const signup = mode === 'signup';
+  $('#login-name-field')?.classList.toggle('hidden', !signup);
+  $('#login-name')?.toggleAttribute('required', signup);
+  $('#tab-signin')?.classList.toggle('active', !signup);
+  $('#tab-signup')?.classList.toggle('active', signup);
+  if ($('#login-subtitle')) $('#login-subtitle').textContent = signup ? 'Create a secure workspace for your care team' : 'Sign in to your patient retention workspace';
+  if ($('#login-submit-btn')) $('#login-submit-btn').textContent = signup ? 'Create account' : 'Sign in to workspace';
+}
+
+async function handleLogin(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const mode = $('#tab-signup')?.classList.contains('active') ? 'signup' : 'signin';
+  const button = $('#login-submit-btn');
+  const error = $('#login-error');
+  const formData = new FormData(form);
+  const body = mode === 'signup'
+    ? { name: formData.get('name'), email: formData.get('email'), password: formData.get('password') }
+    : { email: formData.get('email'), password: formData.get('password') };
+  button.disabled = true;
+  button.textContent = 'Checking your workspace...';
+  error?.classList.add('hidden');
+  try {
+    const response = await api(`/api/auth/${mode}`, { method: 'POST', body: JSON.stringify(body) });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || 'Authentication failed');
+    localStorage.setItem(TOKEN_KEY, data.token);
+    redirectToDashboard();
+  } catch (requestError) {
+    if (error) { error.textContent = requestError.message; error.classList.remove('hidden'); }
+  } finally {
+    button.disabled = false;
+    button.textContent = mode === 'signup' ? 'Create account' : 'Sign in to workspace';
+  }
+}
+
+function formatDate(value) {
+  if (!value) return 'Recently';
+  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+}
+
+function riskClass(level) { return `risk-${String(level || 'low').toLowerCase()}`; }
+function riskBadge(level) { return `<span class="risk-badge ${riskClass(level)}">${escapeHtml(level)} risk</span>`; }
+
+function renderShell() {
+  document.querySelectorAll('[data-nav]').forEach((link) => {
+    link.classList.toggle('active', link.dataset.nav === page);
+  });
+  document.querySelectorAll('[data-signout]').forEach((button) => button.addEventListener('click', signout));
+}
+
+async function loadDashboard() {
+  const response = await api('/api/user/analytics');
+  if (!response.ok) return;
+  const data = await response.json();
+  const values = { evaluated: data.total_evaluated, average: `${data.avg_churn}%`, high: data.high_risk_count, medium: data.medium_risk_count, low: data.low_risk_count };
+  Object.entries(values).forEach(([key, value]) => { const node = $(`[data-stat="${key}"]`); if (node) node.textContent = value; });
+  const historyResponse = await api('/api/history');
+  if (!historyResponse.ok) return;
+  const history = (await historyResponse.json()).history.slice(0, 5);
+  const list = $('#recent-history');
+  if (!list) return;
+  list.innerHTML = history.length ? history.map((item) => `<li><div><strong>${escapeHtml(item.primary_reason)}</strong><small>${formatDate(item.created_at)}</small></div><span>${(item.probability * 100).toFixed(1)}%</span></li>`).join('') : '<li class="empty-row">No predictions yet. Start your first assessment.</li>';
+}
+
+async function handleSinglePrediction(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = $('#predict-submit');
+  const error = $('#predict-error');
+  const result = $('#prediction-result');
+  const payload = Object.fromEntries(new FormData(form).entries());
+  ['age', 'tenure_months', 'referrals_made', 'visits_last_year', 'missed_appointments', 'days_since_last_visit', 'portal_usage', 'billing_issues'].forEach((field) => { payload[field] = Number.parseInt(payload[field], 10); });
+  ['overall_satisfaction', 'wait_time_satisfaction', 'staff_satisfaction', 'provider_rating', 'avg_out_of_pocket_cost', 'distance_to_facility'].forEach((field) => { payload[field] = Number.parseFloat(payload[field]); });
+  button.disabled = true;
+  button.textContent = 'Generating assessment...';
+  error?.classList.add('hidden');
+  try {
+    const response = await api('/api/predict', { method: 'POST', body: JSON.stringify(payload) });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || 'Assessment failed');
+    result.classList.remove('hidden');
+    result.innerHTML = `<div class="result-head"><div><span class="eyebrow">ASSESSMENT COMPLETE</span><h2>${data.percentage}% churn probability</h2></div>${riskBadge(data.risk_level)}</div><div class="result-reason"><span>Primary churn reason</span><strong>${escapeHtml(data.primary_churn_reason)}</strong></div><div class="result-advice"><span>Retention advice</span><p>${escapeHtml(data.retention_advice)}</p></div>`;
+    result.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (requestError) {
+    if (error) { error.textContent = requestError.message; error.classList.remove('hidden'); }
+  } finally { button.disabled = false; button.textContent = 'Generate risk assessment'; }
+}
+
+async function handleCohortUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const status = $('#cohort-status');
+  const error = $('#cohort-error');
+  status?.classList.remove('hidden'); error?.classList.add('hidden');
+  const formData = new FormData(); formData.append('file', file);
+  try {
+    const response = await api('/api/batch-predict', { method: 'POST', body: formData });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || 'Upload failed');
+    cohortRows = data.results.map((item, index) => ({ ...item, record_id: `REC-${String(index + 1).padStart(4, '0')}` }));
+    $('#cohort-results')?.classList.remove('hidden');
+    $('#cohort-total').textContent = data.total; $('#cohort-high').textContent = data.high_risk; $('#cohort-medium').textContent = data.medium_risk; $('#cohort-low').textContent = data.low_risk;
+    renderCohortRows();
+  } catch (requestError) { if (error) { error.textContent = requestError.message; error.classList.remove('hidden'); } }
+  finally { status?.classList.add('hidden'); event.target.value = ''; }
+}
+
+function renderCohortRows() {
+  const query = ($('#record-filter')?.value || '').trim().toLowerCase();
+  const rows = cohortRows.filter((item) => item.record_id.toLowerCase().includes(query) || String(item.patient_id || '').toLowerCase().includes(query));
+  const body = $('#cohort-table-body');
+  if (!rows.length) { body.innerHTML = '<tr><td colspan="6" class="empty-row">No records match this filter.</td></tr>'; return; }
+  body.innerHTML = rows.map((item) => `<tr><td><strong>${item.record_id}</strong></td><td>${escapeHtml(item.patient_id)}</td><td>${item.percentage}%</td><td>${riskBadge(item.risk_level)}</td><td>${escapeHtml(item.primary_churn_reason)}</td><td>${escapeHtml(item.retention_advice)}</td></tr>`).join('');
+}
+
+function downloadCohortResults() {
+  const rows = cohortRows.map((item) => `<tr><td>${escapeHtml(item.record_id)}</td><td>${escapeHtml(item.patient_id)}</td><td>${item.percentage}%</td><td>${escapeHtml(item.risk_level)}</td><td>${escapeHtml(item.primary_churn_reason)}</td><td>${escapeHtml(item.retention_advice)}</td></tr>`).join('');
+  const printWindow = window.open('', '_blank', 'width=1200,height=800');
+  if (!printWindow) return;
+  printWindow.document.write(`<!doctype html><html><head><title>Patient Churn Cohort Results</title><style>body{font-family:Arial,sans-serif;color:#0f172a;padding:28px}h1{font-size:24px}p{color:#64748b}table{width:100%;border-collapse:collapse;font-size:11px}th,td{padding:10px;border:1px solid #cbd5e1;text-align:left;vertical-align:top}th{background:#0f172a;color:#fff}tr:nth-child(even){background:#f8fafc}@media print{body{padding:0}}</style></head><body><h1>Patient Churn Prediction and Retention Advisor</h1><p>Cohort risk assessment generated ${new Date().toLocaleString()}</p><table><thead><tr><th>Record ID</th><th>Patient ID</th><th>Probability</th><th>Risk</th><th>Primary reason</th><th>Retention advice</th></tr></thead><tbody>${rows}</tbody></table></body></html>`);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+}
+
+async function loadHistory() {
+  const response = await api('/api/history');
+  if (!response.ok) return;
+  const records = (await response.json()).history;
+  const body = $('#history-body');
+  if (!records.length) { body.innerHTML = '<tr><td colspan="5" class="empty-row">No prediction history yet.</td></tr>'; return; }
+  body.innerHTML = records.map((item) => `<tr><td>${formatDate(item.created_at)}</td><td>${(item.probability * 100).toFixed(1)}%</td><td>${riskBadge(item.risk_level)}</td><td>${escapeHtml(item.primary_reason)}</td><td>${escapeHtml(item.retention_advice)}</td></tr>`).join('');
+}
+
+async function loadAnalytics() {
+  const response = await api('/api/user/analytics');
+  if (!response.ok) return;
+  const data = await response.json();
+  const values = { evaluated: data.total_evaluated, average: `${data.avg_churn}%`, high: data.high_risk_count, medium: data.medium_risk_count, low: data.low_risk_count };
+  Object.entries(values).forEach(([key, value]) => { const node = $(`[data-stat="${key}"]`); if (node) node.textContent = value; });
+  const cohortBody = $('#cohort-history');
+  if (!data.cohort_uploads.length) { cohortBody.innerHTML = '<div class="empty-state">No cohort uploads yet.</div>'; return; }
+  cohortBody.innerHTML = data.cohort_uploads.map((item) => `<article class="cohort-history-card"><div><strong>${escapeHtml(item.filename)}</strong><small>${formatDate(item.created_at)}</small></div><span>${item.total_patients} patients</span><div class="cohort-risk-line"><b>${item.high_risk} high</b><b>${item.medium_risk} medium</b><b>${item.low_risk} low</b></div></article>`).join('');
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  if (page === 'login') {
+    if (localStorage.getItem(TOKEN_KEY)) { redirectToDashboard(); return; }
+    setLoginMode(new URLSearchParams(window.location.search).get('mode') === 'signup' ? 'signup' : 'signin');
+    $('#login-form')?.addEventListener('submit', handleLogin);
+    $('#tab-signin')?.addEventListener('click', () => setLoginMode('signin'));
+    $('#tab-signup')?.addEventListener('click', () => setLoginMode('signup'));
+    return;
+  }
+  if (document.body.dataset.protected === 'true') {
+    const user = await requireAuth();
+    if (!user) return;
+    renderShell();
+    if (page === 'dashboard') await loadDashboard();
+    if (page === 'predict') $('#predict-form')?.addEventListener('submit', handleSinglePrediction);
+    if (page === 'cohort') $('#cohort-file')?.addEventListener('change', handleCohortUpload);
+    if (page === 'cohort') { $('#record-filter')?.addEventListener('input', renderCohortRows); $('#download-cohort')?.addEventListener('click', downloadCohortResults); }
+    if (page === 'history') await loadHistory();
+    if (page === 'analytics') await loadAnalytics();
+  }
+});

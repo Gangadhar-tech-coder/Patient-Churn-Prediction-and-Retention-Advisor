@@ -40,7 +40,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // If we fail, clear token and show login
     localStorage.removeItem(tokenKey);
   }
-  showLogin();
+  showLanding();
 });
 
 // Auth
@@ -74,7 +74,7 @@ async function handleLoginSubmit(e) {
   $('login-submit-btn').disabled = true;
   
   try {
-    const url = mode === 'signup' ? '/api/auth/signup' : '/api/auth/signin';
+    const url = getApiUrl(mode === 'signup' ? '/api/auth/signup' : '/api/auth/signin');
     const body = mode === 'signup' ? { email, password, name } : { email, password };
     
     const res = await fetch(url, {
@@ -101,13 +101,21 @@ async function handleLoginSubmit(e) {
 function signout() {
   localStorage.removeItem(tokenKey);
   STATE.user = null;
-  showLogin();
+  showLanding();
 }
 
 // Navigation
-function showLogin() {
+function showLanding() {
+  $('landing-view').classList.remove('hidden');
+  $('login-view').classList.add('hidden');
+  $('app-layout').classList.add('hidden');
+}
+
+function showLogin(mode = 'signin') {
+  $('landing-view').classList.add('hidden');
   $('login-view').classList.remove('hidden');
   $('app-layout').classList.add('hidden');
+  setLoginMode(mode);
 }
 
 function showApp() {
@@ -134,12 +142,67 @@ function navigate(view) {
 
 function renderAdvisorView() {
   if (!STATE.dataset) {
-    if ($('advisor-content')) $('advisor-content').classList.add('hidden');
-    if ($('advisor-empty-state')) $('advisor-empty-state').classList.remove('hidden');
+    if ($('adv-card') && $('adv-card').classList.contains('hidden')) {
+      if ($('adv-empty')) $('adv-empty').classList.remove('hidden');
+    }
     return;
   }
-  if ($('advisor-content')) $('advisor-content').classList.remove('hidden');
-  if ($('advisor-empty-state')) $('advisor-empty-state').classList.add('hidden');
+  if ($('adv-card')) $('adv-card').classList.add('hidden');
+  if ($('adv-empty')) $('adv-empty').classList.add('hidden');
+}
+
+async function handleSinglePrediction(event) {
+  event.preventDefault();
+  const form = event.target;
+  const button = $('single-predict-btn');
+  const error = $('single-predict-error');
+  const payload = Object.fromEntries(new FormData(form).entries());
+  const integerFields = ['age', 'tenure_months', 'referrals_made', 'visits_last_year', 'missed_appointments', 'days_since_last_visit', 'portal_usage', 'billing_issues'];
+  const decimalFields = ['overall_satisfaction', 'wait_time_satisfaction', 'staff_satisfaction', 'provider_rating', 'avg_out_of_pocket_cost', 'distance_to_facility'];
+  integerFields.forEach(field => { payload[field] = Number.parseInt(payload[field], 10); });
+  decimalFields.forEach(field => { payload[field] = Number.parseFloat(payload[field]); });
+  button.disabled = true;
+  button.innerHTML = 'Assessing patient <span class="button-spinner"></span>';
+  error.classList.add('hidden');
+
+  try {
+    const response = await fetch(getApiUrl('/api/predict'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem(tokenKey)}` },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || 'The patient assessment could not be completed.');
+    renderSinglePrediction(data, payload);
+  } catch (err) {
+    error.textContent = err.message;
+    error.classList.remove('hidden');
+  } finally {
+    button.disabled = false;
+    button.innerHTML = 'Generate risk assessment <span>&rarr;</span>';
+  }
+}
+
+function renderSinglePrediction(result, patient) {
+  $('adv-empty').classList.add('hidden');
+  $('adv-card').classList.remove('hidden');
+  $('adv-patient-id').textContent = `${patient.specialty} patient`;
+  $('adv-icon').textContent = patient.gender.charAt(0).toUpperCase();
+  $('adv-prob').textContent = `${result.percentage}%`;
+  const riskColor = result.risk_level === 'High' ? '#ef4444' : result.risk_level === 'Medium' ? '#f59e0b' : '#22c55e';
+  $('adv-risk-tag').textContent = `${result.risk_level} Risk`;
+  $('adv-risk-tag').style.background = riskColor;
+  $('adv-status').textContent = result.percentage >= 50 ? 'Likely to churn' : 'Likely retained';
+  $('adv-reason').textContent = result.primary_churn_reason;
+  $('adv-advice').textContent = result.retention_advice;
+  const metricItems = [
+    ['Engagement score', result.metrics.engagement_score],
+    ['Satisfaction average', result.metrics.satisfaction_avg],
+    ['Cost per visit', `$${result.metrics.cost_per_visit.toFixed(0)}`],
+    ['Visit frequency', result.metrics.visit_frequency]
+  ];
+  $('adv-attributes').innerHTML = metricItems.map(([label, value]) => `<div class="result-attribute"><span>${label}</span><strong>${value}</strong></div>`).join('') + result.interventions.map(item => `<div class="result-intervention"><span>${item.icon}</span><div><strong>${item.priority} priority</strong><span>${item.text}</span></div></div>`).join('');
+  navigate('advisor');
 }
 
 // Upload

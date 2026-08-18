@@ -27,7 +27,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Patient Churn Prediction API",
+    title="Patient Churn Prediction and Retention Advisor",
     description="AI-powered churn probability %, churn reason diagnosis, and retention advice engine",
     version="2.0.0",
     lifespan=lifespan,

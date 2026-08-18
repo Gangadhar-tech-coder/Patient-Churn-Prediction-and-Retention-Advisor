@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Dashboard | Patient Churn Prediction and Retention Advisor</title>
+  <link rel="stylesheet" href="/frontend/style.css">
+  <style>.dashboard-page .page-content { padding-top: 42px; }.dashboard-page .section-heading:first-of-type { margin-top: 0; }.dashboard-page .stat-grid { margin-top: 0; }</style>
+</head>
+<body data-page="dashboard" data-protected="true" class="dashboard-page">
+  <div class="app-frame">
+    <aside class="sidebar">
+      <a class="sidebar-brand" href="dashboard.html"><span class="brand-mark">+</span><span><strong>Patient Churn</strong><small>Prediction & Retention</small></span></a>
+      <nav class="sidebar-nav">
+        <a data-nav="dashboard" href="dashboard.html"><span>⌂</span>Dashboard</a>
+        <a data-nav="predict" href="predict.html"><span>＋</span>Patient prediction</a>
+        <a data-nav="cohort" href="cohort.html"><span>▦</span>Cohort analysis</a>
+        <a data-nav="history" href="history.html"><span>◷</span>Prediction history</a>
+        <a data-nav="analytics" href="analytics.html"><span>◒</span>My analytics</a>
+      </nav>
+      <div class="sidebar-user"><span class="user-avatar" data-user-initial>D</span><div><strong data-user-name>Doctor</strong><small data-user-email>doctor@hospital.com</small></div><button data-signout title="Sign out">↪</button></div>
+    </aside>
+    <main class="page-main">
+      <header class="topbar"><div><span class="eyebrow">PATIENT RETENTION WORKSPACE</span><h1>Good to see you, <span data-user-name>Doctor</span></h1></div><a class="button button-primary" href="predict.html">New assessment <span>→</span></a></header>
+      <section class="page-content">
+        <div class="section-heading"><div><span class="eyebrow">YOUR WORKSPACE</span><h2>At a glance</h2></div><a class="text-link" href="analytics.html">View full analytics →</a></div>
+        <div class="stat-grid">
+          <article class="stat-card"><span class="stat-icon blue">◌</span><small>Patients evaluated</small><strong data-stat="evaluated">0</strong><span class="stat-caption">All-time predictions</span></article>
+          <article class="stat-card"><span class="stat-icon teal">◒</span><small>Average churn risk</small><strong data-stat="average">0%</strong><span class="stat-caption">Across your assessments</span></article>
+          <article class="stat-card stat-high"><span class="stat-icon red">!</span><small>High risk</small><strong data-stat="high">0</strong><span class="stat-caption">Needs timely outreach</span></article>
+          <article class="stat-card"><span class="stat-icon amber">◔</span><small>Medium risk</small><strong data-stat="medium">0</strong><span class="stat-caption">Worth a closer look</span></article>
+        </div>
+        <div class="dashboard-grid">
+          <section class="panel"><div class="section-heading compact"><div><span class="eyebrow">RECENT ACTIVITY</span><h2>Latest predictions</h2></div><a class="text-link" href="history.html">See history →</a></div><ul id="recent-history" class="activity-list"><li class="empty-row">Loading your predictions...</li></ul></section>
+          <section class="panel action-panel"><span class="eyebrow">QUICK ACTIONS</span><h2>Where would you like to begin?</h2><a href="predict.html" class="action-link"><span class="action-icon">＋</span><span><strong>Assess one patient</strong><small>Get a risk score and tailored advice</small></span><b>→</b></a><a href="cohort.html" class="action-link"><span class="action-icon">▦</span><span><strong>Analyze a cohort</strong><small>Upload CSV or Excel for batch insights</small></span><b>→</b></a></section>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="/frontend/shared.js"></script><script>/* Dashboard page uses shared authenticated data loading. */</script>
+</body>
+</html>

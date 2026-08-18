@@ -93,6 +93,7 @@ async def batch_predict(file: UploadFile = File(...), authorization: Optional[st
         raise HTTPException(status_code=400, detail=f"Error reading file: {str(e)}")
 
     # Normalize column names: strip whitespace, fix common variations
+    df_original = df.copy()
     df.columns = df.columns.str.strip()
     col_mapping = {}
     for col in df.columns:
@@ -111,7 +112,7 @@ async def batch_predict(file: UploadFile = File(...), authorization: Optional[st
             detail="Please upload the correct file",
         )
 
-    batch_results = predictor.predict_batch(df)
+    batch_results = predictor.predict_batch(df, df_original)
 
     results = []
     high = medium = low = 0

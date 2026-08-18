@@ -88,9 +88,9 @@ class ChurnPredictor:
     @staticmethod
     def _classify_risk(probability: float) -> Tuple[str, str]:
         """Classify into High / Medium / Low risk tier."""
-        if probability >= 0.65:
+        if probability >= 0.75:
             return "High", "risk-high"
-        elif probability >= 0.45:
+        elif probability >= 0.50:
             return "Medium", "risk-medium"
         else:
             return "Low", "risk-low"
@@ -99,7 +99,7 @@ class ChurnPredictor:
         self, df_input: pd.DataFrame, patient: PatientInput, probability: float
     ) -> Tuple[str, str]:
         """Predict primary churn reason and map retention advice."""
-        if probability < 0.45:
+        if probability < 0.50:
             reason = "Not currently at risk (satisfied / engaged patient)"
         else:
             if patient.missed_appointments >= 3:
@@ -134,9 +134,23 @@ class ChurnPredictor:
         )
         return reason, advice
 
-    def predict_batch(self, df_raw: pd.DataFrame) -> List[Dict]:
+    def predict_batch(self, df_raw: pd.DataFrame, df_original: pd.DataFrame = None) -> List[Dict]:
         """Fast vectorized batch prediction for entire cohort at once."""
         df = df_raw.copy()
+
+        # Auto-fill missing columns (medians/modes)
+        defaults = {
+            "Age": 65, "Tenure_Months": 36, "Visits_Last_Year": 2, "Missed_Appointments": 0,
+            "Days_Since_Last_Visit": 90, "Overall_Satisfaction": 3.5, "Wait_Time_Satisfaction": 3.5,
+            "Staff_Satisfaction": 3.5, "Provider_Rating": 3.5, "Avg_Out_Of_Pocket_Cost": 500,
+            "Billing_Issues": 0, "Portal_Usage": 1, "Referrals_Made": 0,
+            "Distance_To_Facility_Miles": 15.0, "Gender": "Unknown", "State": "Unknown",
+            "Specialty": "Primary Care", "Insurance_Type": "Unknown"
+        }
+        for col, val in defaults.items():
+            if col not in df.columns:
+                df[col] = val
+        df.fillna(defaults, inplace=True)
 
         df["Engagement_Score"] = df["Visits_Last_Year"] - df["Missed_Appointments"]
         df["Cost_Per_Visit"] = df["Avg_Out_Of_Pocket_Cost"] / (df["Visits_Last_Year"] + 1)
@@ -167,7 +181,7 @@ class ChurnPredictor:
             pct = round(prob * 100, 1)
             risk_level, _ = self._classify_risk(prob)
 
-            if prob < 0.45:
+            if prob < 0.50:
                 reason = "Not currently at risk (satisfied / engaged patient)"
             else:
                 if row.get("Missed_Appointments", 0) >= 3:
@@ -201,6 +215,8 @@ class ChurnPredictor:
             )
 
             patient_id = str(row["PatientID"]) if "PatientID" in row else f"P-{idx+1}"
+            
+            orig_row = df_original.iloc[idx] if df_original is not None else row
 
             results.append({
                 "index": idx,
@@ -210,6 +226,7 @@ class ChurnPredictor:
                 "risk_level": risk_level,
                 "primary_churn_reason": reason,
                 "retention_advice": advice,
+                "attributes": orig_row.to_dict(),
             })
 
         return results

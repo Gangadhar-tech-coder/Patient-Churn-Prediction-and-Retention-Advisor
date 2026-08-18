@@ -15,16 +15,24 @@ let STATE = {
 let charts = {};
 
 // On Load
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   const token = localStorage.getItem(tokenKey);
   if (token) {
-    // we assume it's valid for now, or decode it
-    // In a real app we'd fetch /api/auth/me but Gangadhar's repo doesn't have it
-    STATE.user = { name: "Doctor", email: "doctor@hospital.com" };
-    showApp();
-  } else {
-    showLogin();
+    try {
+      const res = await fetch('/api/auth/me', {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        STATE.user = data.user;
+        showApp();
+        return;
+      }
+    } catch(e) {}
+    // If we fail, clear token and show login
+    localStorage.removeItem(tokenKey);
   }
+  showLogin();
 });
 
 // Auth

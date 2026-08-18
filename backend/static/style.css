@@ -1846,3 +1846,5 @@ a:hover { text-decoration: underline; }
   .charts-row { grid-template-columns: 1fr; }
   .analytics-cards { grid-template-columns: repeat(3, 1fr); }
 }
+
+.hidden { display: none !important; }

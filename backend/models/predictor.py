@@ -29,6 +29,7 @@ class ChurnPredictor:
         self.columns = None
         self.reason_encoder = None
         self.advice_map = {}
+        self.best_thr = 0.37
         self._loaded = False
 
     def load(self, model_dir: str = None):
@@ -45,6 +46,9 @@ class ChurnPredictor:
             os.path.join(model_dir, "reason_encoder.pkl")
         )
         self.advice_map = joblib.load(os.path.join(model_dir, "advice_map.pkl"))
+        thr_path = os.path.join(model_dir, "best_thr.pkl")
+        if os.path.exists(thr_path):
+            self.best_thr = joblib.load(thr_path)
         self._loaded = True
 
     @property
@@ -89,12 +93,12 @@ class ChurnPredictor:
         df = df.reindex(columns=self.columns, fill_value=0)
         return df
 
-    @staticmethod
-    def _classify_risk(probability: float) -> Tuple[str, str]:
-        """Classify into High / Medium / Low risk tier."""
-        if probability >= 0.75:
+    def _classify_risk(self, probability: float) -> Tuple[str, str]:
+        """Classify into High / Medium / Low risk tier (threshold-tuned)."""
+        thr = self.best_thr
+        if probability >= 0.70:
             return "High", "risk-high"
-        elif probability >= 0.50:
+        elif probability >= thr:
             return "Medium", "risk-medium"
         else:
             return "Low", "risk-low"
@@ -103,7 +107,7 @@ class ChurnPredictor:
         self, df_input: pd.DataFrame, patient: PatientInput, probability: float
     ) -> Tuple[str, str]:
         """Predict primary churn reason and map retention advice."""
-        if probability < 0.50:
+        if probability < self.best_thr:
             reason = "Not currently at risk (satisfied / engaged patient)"
         else:
             if patient.missed_appointments >= 3:
@@ -185,7 +189,7 @@ class ChurnPredictor:
             pct = round(prob * 100, 1)
             risk_level, _ = self._classify_risk(prob)
 
-            if prob < 0.50:
+            if prob < self.best_thr:
                 reason = "Not currently at risk (satisfied / engaged patient)"
             else:
                 if row.get("Missed_Appointments", 0) >= 3:

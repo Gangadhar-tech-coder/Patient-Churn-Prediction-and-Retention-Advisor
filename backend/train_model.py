@@ -93,7 +93,7 @@ def train():
 
     print("[3/4] Training Churn Probability Model (XGBoost)...")
     churn_model = XGBClassifier(
-        n_estimators=200, max_depth=10, random_state=42, n_jobs=-1
+        n_estimators=200, max_depth=6, random_state=42, n_jobs=-1, objective='binary:logistic'
     )
     churn_model.fit(X_train, y_churn_train)
     churn_probs = churn_model.predict_proba(X_test)[:, 1]
@@ -106,7 +106,7 @@ def train():
     y_reason_encoded_test = reason_encoder.transform(y_reason_test)
 
     reason_model = XGBClassifier(
-        n_estimators=200, max_depth=12, random_state=42, n_jobs=-1
+        n_estimators=200, max_depth=6, random_state=42, n_jobs=-1, objective='multi:softprob'
     )
     reason_model.fit(X_train, y_reason_encoded_train)
     reason_acc = reason_model.score(X_test, y_reason_encoded_test)

@@ -17,7 +17,7 @@ An end-to-end Machine Learning web application for predicting patient churn risk
 ## Tech Stack
 
 - **Backend**: FastAPI, Uvicorn, Scikit-Learn (Random Forest), Pandas, NumPy, Pydantic
-- **Frontend**: React (Vite), Vanilla CSS (MedVault Dark Theme v2 design system)
+- **Frontend**: HTML,CSS,JS
 
 ---
 

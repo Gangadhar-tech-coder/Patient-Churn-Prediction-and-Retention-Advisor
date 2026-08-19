@@ -92,13 +92,26 @@ def train():
     )
 
     print("[3/4] Training Churn Probability Model (XGBoost)...")
+    churn_rate = y_churn_train.mean()
+    print(f"   -> Training churn rate: {churn_rate:.2%}")
     churn_model = XGBClassifier(
-        n_estimators=200, max_depth=10, random_state=42, n_jobs=-1
+        n_estimators=200, max_depth=10, random_state=42, n_jobs=-1,
+        scale_pos_weight=(1 - churn_rate) / churn_rate, eval_metric="logloss",
     )
     churn_model.fit(X_train, y_churn_train)
     churn_probs = churn_model.predict_proba(X_test)[:, 1]
     auc = roc_auc_score(y_churn_test, churn_probs)
     print(f"   -> Binary Churn Model ROC-AUC: {auc:.4f}")
+
+    # Decision threshold tuned for retention: catch more churners (recall-first)
+    best_thr = 0.37
+    churn_preds = (churn_probs >= best_thr).astype(int)
+    from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+    print(f"   -> Metrics at threshold {best_thr}:")
+    print(f"      Acc={accuracy_score(y_churn_test, churn_preds):.4f} "
+          f"Prec={precision_score(y_churn_test, churn_preds):.4f} "
+          f"Rec={recall_score(y_churn_test, churn_preds):.4f} "
+          f"F1={f1_score(y_churn_test, churn_preds):.4f}")
 
     print("[4/4] Training Churn Reason Classifier (XGBoost)...")
     reason_encoder = LabelEncoder()
@@ -121,6 +134,7 @@ def train():
     joblib.dump(model_columns, os.path.join(ml_model_dir, "model_columns.pkl"))
     joblib.dump(reason_encoder, os.path.join(ml_model_dir, "reason_encoder.pkl"))
     joblib.dump(advice_map, os.path.join(ml_model_dir, "advice_map.pkl"))
+    joblib.dump(best_thr, os.path.join(ml_model_dir, "best_thr.pkl"))
 
     print(f"\n[OK] All XGBoost artifacts successfully saved to: {ml_model_dir}")
 

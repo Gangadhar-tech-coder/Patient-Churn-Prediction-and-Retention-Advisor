@@ -7,6 +7,7 @@ Manages users, predictions, and cohort datasets via SQLAlchemy & SQLite.
 import os
 import hashlib
 import uuid
+from datetime import timezone
 from sqlalchemy import create_engine, Column, String, Integer, Float, Text, ForeignKey, DateTime
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.sql import func
@@ -159,7 +160,7 @@ def get_user_predictions(user_id: str, limit: int = 50) -> list:
             "risk_level": p.risk_level,
             "primary_reason": p.primary_reason,
             "retention_advice": p.retention_advice,
-            "created_at": str(p.created_at)
+            "created_at": p.created_at.replace(tzinfo=timezone.utc).isoformat().replace("+00:00", "Z") if p.created_at else None
         } for p in preds]
     finally:
         db.close()
@@ -170,7 +171,7 @@ def get_user_analytics(user_id: str) -> dict:
     try:
         preds = db.query(Prediction).filter(Prediction.user_id == user_id).all()
         cohorts = db.query(CohortDataset).filter(CohortDataset.user_id == user_id)\
-                    .order_by(CohortDataset.created_at.desc()).limit(10).all()
+                .order_by(CohortDataset.created_at.desc()).all()
 
         probabilities = [p.probability for p in preds] if preds else []
         return {
@@ -186,7 +187,7 @@ def get_user_analytics(user_id: str) -> dict:
                 "high_risk": c.high_risk,
                 "medium_risk": c.medium_risk,
                 "low_risk": c.low_risk,
-                "created_at": str(c.created_at)
+                "created_at": c.created_at.replace(tzinfo=timezone.utc).isoformat().replace("+00:00", "Z") if c.created_at else None
             } for c in cohorts],
         }
     finally:

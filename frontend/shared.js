@@ -1,5 +1,6 @@
 const API_BASE = '';
 const TOKEN_KEY = 'patient_churn_token';
+const COHORT_STORAGE_KEY = 'patient_churn_cohort_results';
 
 const api = (path, options = {}) => fetch(`${API_BASE}${path}`, {
   ...options,
@@ -14,6 +15,36 @@ const page = document.body.dataset.page;
 const $ = (selector) => document.querySelector(selector);
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
 let cohortRows = [];
+let cohortPage = 1;
+const COHORT_PAGE_SIZE = 50;
+
+function persistCohortResults(stats) {
+  try {
+    localStorage.setItem(COHORT_STORAGE_KEY, JSON.stringify({ rows: cohortRows, stats }));
+  } catch (error) {
+    console.warn('Cohort results could not be saved locally.', error);
+  }
+}
+
+function restoreCohortResults() {
+  try {
+    const stored = localStorage.getItem(COHORT_STORAGE_KEY);
+    if (!stored) return false;
+    const saved = JSON.parse(stored);
+    if (!Array.isArray(saved.rows) || !saved.rows.length || !saved.stats) return false;
+    cohortRows = saved.rows;
+    $('#cohort-results')?.classList.remove('hidden');
+    $('#cohort-total').textContent = saved.stats.total;
+    $('#cohort-high').textContent = saved.stats.high;
+    $('#cohort-medium').textContent = saved.stats.medium;
+    $('#cohort-low').textContent = saved.stats.low;
+    renderCohortRows();
+    return true;
+  } catch (error) {
+    localStorage.removeItem(COHORT_STORAGE_KEY);
+    return false;
+  }
+}
 
 function redirectToLogin() {
   window.location.href = '/frontend/login.html';
@@ -89,7 +120,10 @@ async function handleLogin(event) {
 
 function formatDate(value) {
   if (!value) return 'Recently';
-  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+  const normalized = String(value).includes('T') ? String(value) : String(value).replace(' ', 'T');
+  const utcValue = /(?:Z|[+-]\d{2}:?\d{2})$/.test(normalized) ? normalized : `${normalized}Z`;
+  const date = new Date(utcValue);
+  return Number.isNaN(date.getTime()) ? 'Recently' : new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date);
 }
 
 function riskClass(level) { return `risk-${String(level || 'low').toLowerCase()}`; }
@@ -152,6 +186,8 @@ async function handleCohortUpload(event) {
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || 'Upload failed');
     cohortRows = data.results.map((item, index) => ({ ...item, record_id: `REC-${String(index + 1).padStart(4, '0')}` }));
+    cohortPage = 1;
+    persistCohortResults({ total: data.total, high: data.high_risk, medium: data.medium_risk, low: data.low_risk });
     $('#cohort-results')?.classList.remove('hidden');
     $('#cohort-total').textContent = data.total; $('#cohort-high').textContent = data.high_risk; $('#cohort-medium').textContent = data.medium_risk; $('#cohort-low').textContent = data.low_risk;
     renderCohortRows();
@@ -163,8 +199,42 @@ function renderCohortRows() {
   const query = ($('#record-filter')?.value || '').trim().toLowerCase();
   const rows = cohortRows.filter((item) => item.record_id.toLowerCase().includes(query) || String(item.patient_id || '').toLowerCase().includes(query));
   const body = $('#cohort-table-body');
-  if (!rows.length) { body.innerHTML = '<tr><td colspan="6" class="empty-row">No records match this filter.</td></tr>'; return; }
-  body.innerHTML = rows.map((item) => `<tr><td><strong>${item.record_id}</strong></td><td>${escapeHtml(item.patient_id)}</td><td>${item.percentage}%</td><td>${riskBadge(item.risk_level)}</td><td>${escapeHtml(item.primary_churn_reason)}</td><td>${escapeHtml(item.retention_advice)}</td></tr>`).join('');
+  const totalPages = Math.ceil(rows.length / COHORT_PAGE_SIZE) || 1;
+  cohortPage = Math.min(cohortPage, totalPages);
+  const pageRows = rows.slice((cohortPage - 1) * COHORT_PAGE_SIZE, cohortPage * COHORT_PAGE_SIZE);
+  if (!rows.length) body.innerHTML = '<tr><td colspan="7" class="empty-row">No records match this filter.</td></tr>';
+  else body.innerHTML = pageRows.map((item) => `<tr><td><strong>${escapeHtml(item.record_id)}</strong></td><td>${escapeHtml(item.patient_id)}</td><td>${item.percentage}%</td><td>${riskBadge(item.risk_level)}</td><td>${escapeHtml(item.primary_churn_reason)}</td><td>${escapeHtml(item.retention_advice)}</td><td><button class="button button-secondary patient-view-button" type="button" data-patient-id="${escapeHtml(item.patient_id)}">View</button></td></tr>`).join('');
+  body.querySelectorAll('[data-patient-id]').forEach((button) => button.addEventListener('click', () => openPatientFromCohort(button.dataset.patientId)));
+  const pagination = $('#cohort-pagination');
+  if (pagination) {
+    pagination.classList.toggle('hidden', totalPages <= 1);
+    $('#cohort-page-label').textContent = `Page ${cohortPage} of ${totalPages} · ${rows.length} records`;
+    $('#cohort-prev').disabled = cohortPage === 1;
+    $('#cohort-next').disabled = cohortPage === totalPages;
+  }
+}
+
+function openPatientFromCohort(patientId) {
+  const patient = cohortRows.find((item) => String(item.patient_id) === String(patientId));
+  if (patient) localStorage.setItem('patient_churn_selected_patient', JSON.stringify(patient));
+  window.location.href = 'predict.html';
+}
+
+function loadSelectedPatient() {
+  const raw = localStorage.getItem('patient_churn_selected_patient');
+  if (!raw) return;
+  try {
+    const patient = JSON.parse(raw);
+    const attributes = patient.attributes || {};
+    const fieldMap = { age: 'Age', gender: 'Gender', state: 'State', specialty: 'Specialty', insurance_type: 'Insurance_Type', tenure_months: 'Tenure_Months', referrals_made: 'Referrals_Made', visits_last_year: 'Visits_Last_Year', missed_appointments: 'Missed_Appointments', days_since_last_visit: 'Days_Since_Last_Visit', overall_satisfaction: 'Overall_Satisfaction', wait_time_satisfaction: 'Wait_Time_Satisfaction', staff_satisfaction: 'Staff_Satisfaction', provider_rating: 'Provider_Rating', avg_out_of_pocket_cost: 'Avg_Out_Of_Pocket_Cost', billing_issues: 'Billing_Issues', portal_usage: 'Portal_Usage', distance_to_facility: 'Distance_To_Facility_Miles' };
+    Object.entries(fieldMap).forEach(([field, column]) => {
+      if (attributes[column] !== undefined) {
+        const input = document.querySelector(`[name="${field}"]`);
+        if (input) input.value = attributes[column];
+      }
+    });
+    localStorage.removeItem('patient_churn_selected_patient');
+  } catch (error) { localStorage.removeItem('patient_churn_selected_patient'); }
 }
 
 function downloadCohortResults() {
@@ -211,9 +281,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!user) return;
     renderShell();
     if (page === 'dashboard') await loadDashboard();
-    if (page === 'predict') $('#predict-form')?.addEventListener('submit', handleSinglePrediction);
-    if (page === 'cohort') $('#cohort-file')?.addEventListener('change', handleCohortUpload);
-    if (page === 'cohort') { $('#record-filter')?.addEventListener('input', renderCohortRows); $('#download-cohort')?.addEventListener('click', downloadCohortResults); }
+    if (page === 'predict') { loadSelectedPatient(); $('#predict-form')?.addEventListener('submit', handleSinglePrediction); }
+    if (page === 'cohort') { restoreCohortResults(); $('#cohort-file')?.addEventListener('change', handleCohortUpload); }
+    if (page === 'cohort') { $('#record-filter')?.addEventListener('input', () => { cohortPage = 1; renderCohortRows(); }); $('#cohort-prev')?.addEventListener('click', () => { cohortPage--; renderCohortRows(); }); $('#cohort-next')?.addEventListener('click', () => { cohortPage++; renderCohortRows(); }); $('#download-cohort')?.addEventListener('click', downloadCohortResults); }
     if (page === 'history') await loadHistory();
     if (page === 'analytics') await loadAnalytics();
   }

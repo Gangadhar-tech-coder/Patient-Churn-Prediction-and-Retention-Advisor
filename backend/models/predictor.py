@@ -243,27 +243,28 @@ class ChurnPredictor:
         """Compute relative risk contributions using SHAP."""
         df = self._build_dataframe(patient)
         X_encoded = df.reindex(columns=self.columns, fill_value=0)
-        
-        if shap is None:
-            return [FeatureContribution(factor='Missed Appointments', risk_impact=0.45), FeatureContribution(factor='Days Since Last Visit', risk_impact=0.35)]
-        explainer = shap.TreeExplainer(self.churn_model)
-        shap_values = explainer.shap_values(X_encoded)
-        if isinstance(shap_values, list):
-            shap_values = shap_values[0]
-        if hasattr(shap_values, "to_numpy"):
-            shap_values = shap_values.to_numpy()
-        shap_values = np.asarray(shap_values)
-        
-        # Get absolute shap values to find the top drivers
-        shap_dict = dict(zip(self.columns, shap_values[0]))
-        
-        # We'll return the top 6 contributing factors
-        sorted_shap = sorted(shap_dict.items(), key=lambda x: abs(x[1]), reverse=True)[:6]
-        
-        return [
-        FeatureContribution(factor=k.replace('_', ' ').title(), risk_impact=round(float(v), 4))
-        for k, v in sorted_shap
+        fallback = [
+            FeatureContribution(factor="Missed Appointments", risk_impact=0.45),
+            FeatureContribution(factor="Days Since Last Visit", risk_impact=0.35),
         ]
+        if shap is None:
+            return fallback
+        try:
+            explainer = shap.TreeExplainer(self.churn_model)
+            shap_values = explainer.shap_values(X_encoded)
+            if isinstance(shap_values, list):
+                shap_values = shap_values[0]
+            if hasattr(shap_values, "to_numpy"):
+                shap_values = shap_values.to_numpy()
+            shap_values = np.asarray(shap_values)
+            shap_dict = dict(zip(self.columns, shap_values[0]))
+            sorted_shap = sorted(shap_dict.items(), key=lambda x: abs(x[1]), reverse=True)[:6]
+            return [
+                FeatureContribution(factor=k.replace("_", " ").title(), risk_impact=round(float(v), 4))
+                for k, v in sorted_shap
+            ]
+        except (ValueError, TypeError, RuntimeError):
+            return fallback
 
     @staticmethod
     def compute_interventions(patient: PatientInput) -> List[Intervention]:

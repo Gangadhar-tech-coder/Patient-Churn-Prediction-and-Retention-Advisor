@@ -11,7 +11,21 @@
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary">
   <link rel="stylesheet" href="/frontend/style.css?v=2.0.1">
-  <style>.predict-page .page-content { padding-top: 36px; }.predict-page .prediction-result { scroll-margin-top: 24px; border-top: 4px solid var(--teal); }.result-advice { margin-top: 16px; padding: 18px; border: 1px solid #99F6E4; border-radius: 8px; background: #F0FDFA; }.result-advice span { color: var(--teal); font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }.result-advice p { margin: 8px 0 0; color: var(--slate); font-size: 14px; line-height: 1.7; }</style>
+  <style>
+  .predict-page .page-content { padding-top: 36px; }
+  .predict-page .prediction-result { scroll-margin-top: 24px; border-top: 4px solid var(--teal); transition: all 0.3s ease; }
+  .prediction-result.high-risk-result { border-top-color: #ef4444; box-shadow: 0 10px 25px -5px rgba(239, 68, 68, 0.4); }
+  .prediction-result.medium-risk-result { border-top-color: #f59e0b; box-shadow: 0 10px 25px -5px rgba(245, 158, 11, 0.4); }
+  .prediction-result.high-risk-result .result-reason { background: #fef2f2; border-left-color: #ef4444; }
+  .prediction-result.high-risk-result .result-reason span, .prediction-result.high-risk-result .result-reason strong { color: #ef4444; }
+  .prediction-result.high-risk-result .result-reason strong { color: #991b1b; }
+  .prediction-result.medium-risk-result .result-reason { background: #fffbeb; border-left-color: #f59e0b; }
+  .prediction-result.medium-risk-result .result-reason span, .prediction-result.medium-risk-result .result-reason strong { color: #f59e0b; }
+  .prediction-result.medium-risk-result .result-reason strong { color: #92400e; }
+  .result-advice { margin-top: 16px; padding: 18px; border: 1px solid #99F6E4; border-radius: 8px; background: #F0FDFA; }
+  .result-advice span { color: var(--teal); font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+  .result-advice p { margin: 8px 0 0; color: var(--slate); font-size: 14px; line-height: 1.7; }
+  </style>
 </head>
 <body data-page="predict" data-protected="true" class="predict-page">
   <div class="app-frame">

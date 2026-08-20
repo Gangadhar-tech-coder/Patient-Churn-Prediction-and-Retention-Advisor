@@ -197,7 +197,8 @@ async function handleSinglePrediction(event) {
     const response = await api('/api/predict', { method: 'POST', body: JSON.stringify(payload) });
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || 'Assessment failed');
-    result.classList.remove('hidden');
+    result.classList.remove('hidden', 'high-risk-result', 'medium-risk-result', 'low-risk-result');
+    result.classList.add(`${String(data.risk_level).toLowerCase()}-risk-result`);
     result.innerHTML = `<div class="result-head"><div><span class="eyebrow">ASSESSMENT COMPLETE</span><h2>${data.percentage}% churn probability</h2></div>${riskBadge(data.risk_level)}</div><div class="result-reason"><span>Primary churn reason</span><strong>${escapeHtml(data.primary_churn_reason)}</strong></div><div class="result-advice"><span>Retention advice</span><p>${escapeHtml(data.retention_advice)}</p></div>`;
     result.scrollIntoView({ behavior: 'smooth', block: 'start' });
   } catch (requestError) {
@@ -261,7 +262,16 @@ function renderCohortRows() {
   cohortPage = Math.min(cohortPage, totalPages);
   const pageRows = rows.slice((cohortPage - 1) * COHORT_PAGE_SIZE, cohortPage * COHORT_PAGE_SIZE);
   if (!rows.length) body.innerHTML = '<tr><td colspan="7" class="empty-row">No records match this filter.</td></tr>';
-  else body.innerHTML = pageRows.map((item) => `<tr><td><strong>${escapeHtml(item.record_id)}</strong></td><td>${escapeHtml(item.patient_id)}</td><td>${item.percentage}%</td><td>${riskBadge(item.risk_level)}</td><td>${escapeHtml(item.primary_churn_reason)}</td><td>${escapeHtml(item.retention_advice)}</td><td><button class="button button-secondary patient-view-button" type="button" data-patient-id="${escapeHtml(item.patient_id)}">View</button></td></tr>`).join('');
+  else body.innerHTML = pageRows.map((item) => {
+    let rowStyle = '';
+    const risk = String(item.risk_level).toLowerCase();
+    if (risk === 'high') {
+      rowStyle = 'style="background-color: rgba(254, 226, 226, 0.6);"'; // Light red
+    } else if (risk === 'medium') {
+      rowStyle = 'style="background-color: rgba(254, 249, 195, 0.6);"'; // Light yellow
+    }
+    return `<tr ${rowStyle}><td><strong>${escapeHtml(item.record_id)}</strong></td><td>${escapeHtml(item.patient_id)}</td><td>${item.percentage}%</td><td>${riskBadge(item.risk_level)}</td><td>${escapeHtml(item.primary_churn_reason)}</td><td>${escapeHtml(item.retention_advice)}</td><td><button class="button button-secondary patient-view-button" type="button" data-patient-id="${escapeHtml(item.patient_id)}">View</button></td></tr>`;
+  }).join('');
   body.querySelectorAll('[data-patient-id]').forEach((button) => button.addEventListener('click', () => openPatientFromCohort(button.dataset.patientId)));
   const pagination = $('#cohort-pagination');
   if (pagination) {

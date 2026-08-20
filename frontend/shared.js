@@ -38,12 +38,29 @@ function restoreCohortResults() {
     $('#cohort-high').textContent = saved.stats.high;
     $('#cohort-medium').textContent = saved.stats.medium;
     $('#cohort-low').textContent = saved.stats.low;
+    renderCohortVisualization(saved.stats);
     renderCohortRows();
     return true;
   } catch (error) {
     localStorage.removeItem(COHORT_STORAGE_KEY);
     return false;
   }
+}
+
+function renderCohortVisualization(stats) {
+  const total = Number(stats.total) || 0;
+  const levels = [
+    ['high', Number(stats.high) || 0],
+    ['medium', Number(stats.medium) || 0],
+    ['low', Number(stats.low) || 0]
+  ];
+  levels.forEach(([level, count]) => {
+    const percentage = total ? (count / total) * 100 : 0;
+    const bar = $(`#cohort-chart-${level}`);
+    const value = $(`#cohort-chart-${level}-value`);
+    if (bar) bar.style.setProperty('--bar-height', `${percentage}%`);
+    if (value) value.textContent = total ? `${Math.round(percentage)}%` : '—';
+  });
 }
 
 function redirectToLogin() {
@@ -190,6 +207,7 @@ async function handleCohortUpload(event) {
     persistCohortResults({ total: data.total, high: data.high_risk, medium: data.medium_risk, low: data.low_risk });
     $('#cohort-results')?.classList.remove('hidden');
     $('#cohort-total').textContent = data.total; $('#cohort-high').textContent = data.high_risk; $('#cohort-medium').textContent = data.medium_risk; $('#cohort-low').textContent = data.low_risk;
+    renderCohortVisualization({ total: data.total, high: data.high_risk, medium: data.medium_risk, low: data.low_risk });
     renderCohortRows();
   } catch (requestError) { if (error) { error.textContent = requestError.message; error.classList.remove('hidden'); } }
   finally { status?.classList.add('hidden'); event.target.value = ''; }

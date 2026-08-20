@@ -159,6 +159,36 @@ def test_batch_predict():
     assert r.status_code == 200
     print(f"  ✓ PASS: Excel (.xlsx) batch prediction succeeded (Total={r.json()['total']})")
 
+    # Targetless inference file: score every uploaded record.
+    targetless_buf = io.BytesIO()
+    df.to_csv(targetless_buf, index=False)
+    targetless_buf.seek(0)
+    r = client.post(
+        "/api/batch-predict",
+        files={"file": ("targetless_cohort.csv", targetless_buf, "text/csv")},
+        headers=headers,
+    )
+    assert r.status_code == 200
+    targetless_data = r.json()
+    assert targetless_data["total"] == len(df)
+    assert len(targetless_data["results"]) == len(df)
+    assert all("probability" in row and "risk_level" in row for row in targetless_data["results"])
+    print("  PASS: Targetless CSV scored every record with probability and risk class")
+
+    # A supplied target is optional and ignored during inference.
+    labeled_df = df.assign(Churned=[0, 1, 0])
+    labeled_buf = io.BytesIO()
+    labeled_df.to_csv(labeled_buf, index=False)
+    labeled_buf.seek(0)
+    r = client.post(
+        "/api/batch-predict",
+        files={"file": ("labeled_cohort.csv", labeled_buf, "text/csv")},
+        headers=headers,
+    )
+    assert r.status_code == 200
+    assert r.json()["total"] == len(labeled_df)
+    print("  PASS: Optional target column ignored during inference")
+
 
 def test_history_and_analytics():
     print("\n[TEST 5] GET /api/history & GET /api/user/analytics")

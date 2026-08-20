@@ -1935,6 +1935,25 @@ body { background: var(--page); color: var(--slate); font-family: 'DM Sans', 'Se
 .cohort-pagination span { min-width: 150px; color: var(--muted-slate); font-size: 11px; font-weight: 700; text-align: center; }
 .patient-view-button { padding: 8px 12px; font-size: 10px; }
 .auth-visual { background: linear-gradient(90deg, rgba(15,23,42,.94), rgba(15,23,42,.72)), url('https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=1400&q=80') center/cover; }
-.brand-mark { font-size: 0; }
+.brand-mark { font-size: 0; animation: logoPulse 2.8s ease-in-out infinite; }
 .brand-mark:empty::after { content: none; }
+@keyframes logoPulse { 0%, 100% { transform: scale(1); box-shadow: 0 6px 16px rgba(15,118,110,.25); } 50% { transform: scale(1.06); box-shadow: 0 8px 22px rgba(15,118,110,.4), 0 0 0 5px rgba(45,212,191,.12); } }
+.landing-brand-mark { animation: logoPulse 2.8s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .brand-mark, .landing-brand-mark { animation: none; } }
+.app-frame, .auth-page { background: var(--theme-page); }
+.sidebar { background: linear-gradient(180deg, var(--theme-blue-950) 0%, var(--theme-blue-800) 100%); }
+.sidebar-brand small { color: #A7C8DD; }
+.brand-mark { background: var(--theme-blue-800); box-shadow: 0 6px 16px rgba(29,95,145,.25); }
+.brand-mark i { display: block; width: 3px; border-radius: 2px; background: #B9E0F4; transform: rotate(8deg); }
+.brand-mark i:nth-child(1) { height: 9px; }.brand-mark i:nth-child(2) { height: 15px; background: #76B8DF; }.brand-mark i:nth-child(3) { height: 12px; background: #D9EFFB; }
+.brand-mark { position: relative; display: block; padding: 0; }
+.brand-mark::before { content: ''; position: absolute; inset: 0; background: linear-gradient(#B9E0F4, #B9E0F4) 7px 16px/3px 9px no-repeat, linear-gradient(#76B8DF, #76B8DF) 13px 10px/3px 15px no-repeat, linear-gradient(#D9EFFB, #D9EFFB) 19px 13px/3px 12px no-repeat; transform: rotate(8deg); }
+.topbar, .auth-card { border-color: var(--theme-border); }
+.topbar h1, .section-heading h2, .content-intro h2, .panel h2, .stat-card strong, .auth-card-heading h2 { color: var(--theme-blue-950); }
+.topbar p, .content-intro p, .stat-card small, .auth-card-heading p { color: var(--theme-muted); }
+.eyebrow, .secure-chip, .text-link { color: var(--theme-blue-800); }
+.button-primary { background: var(--theme-blue-800); box-shadow: 0 7px 16px rgba(29,95,145,.18); }.button-primary:hover { background: var(--theme-blue-600); }
+.sidebar-nav a.active { background: var(--theme-blue-800); box-shadow: 0 8px 18px rgba(29,95,145,.2); }
+.sidebar-nav a:hover { background: rgba(183,225,246,.1); }.sidebar-nav a.active span { color: #D9EFFB; }
+.auth-visual { background: linear-gradient(90deg, rgba(18,59,93,.94), rgba(29,95,145,.72)), url('https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=1400&q=80') center/cover; }
 @media (max-width: 620px) { .action-links { grid-template-columns: 1fr; gap: 0; } .sidebar { position: sticky; height: auto; } .cohort-pagination { padding-left: 12px; padding-right: 12px; } }

@@ -33,6 +33,8 @@ MODEL_FEATURES = [
     "Distance_To_Facility_Miles",
 ]
 
+TARGET_COLUMNS = {"Churned", "Churn", "Target", "Label", "Churn_Reason", "Retention_Advice"}
+
 
 @router.get("/health", response_model=HealthResponse)
 async def health_check():
@@ -104,7 +106,13 @@ async def batch_predict(file: UploadFile = File(...), authorization: Optional[st
                 break
     df.rename(columns=col_mapping, inplace=True)
 
-    # Check at least 5 model features exist
+    # Targets are optional in inference files and are never model inputs.
+    target_columns = [column for column in df.columns if column in TARGET_COLUMNS]
+    df.drop(columns=target_columns, inplace=True, errors="ignore")
+    if target_columns:
+        df_original.drop(columns=target_columns, inplace=True, errors="ignore")
+
+    # Require meaningful overlap with the features used during training.
     matched = [f for f in MODEL_FEATURES if f in df.columns]
     if len(matched) < 5:
         raise HTTPException(

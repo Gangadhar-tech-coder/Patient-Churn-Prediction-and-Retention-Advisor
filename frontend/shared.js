@@ -178,7 +178,24 @@ async function loadDashboard() {
   const history = (await historyResponse.json()).history.slice(0, 5);
   const list = $('#recent-history');
   if (!list) return;
-  list.innerHTML = history.length ? history.map((item) => `<li><div><strong>${escapeHtml(item.primary_reason)}</strong><small>${formatDate(item.created_at)}</small></div><span>${(item.probability * 100).toFixed(1)}%</span></li>`).join('') : '<li class="empty-row">No predictions yet. Start your first assessment.</li>';
+  const headerHtml = `<li class="history-header" style="border-bottom: 2px solid #E2E8F0; padding-bottom: 8px; margin-bottom: 8px; align-items: flex-end;">
+    <div style="flex: 0 0 80px;"><small>Patient ID</small></div>
+    <div style="flex: 1;"><small>Reason to leave</small></div>
+    <div style="flex: 0 0 80px; text-align: right;"><small>Churn rate</small></div>
+  </li>`;
+  list.innerHTML = history.length ? headerHtml + history.map((item) => {
+    let riskColor = '';
+    const risk = String(item.risk_level).toLowerCase();
+    if (risk === 'high') riskColor = 'border-left: 4px solid #ef4444; padding-left: 10px;';
+    else if (risk === 'medium') riskColor = 'border-left: 4px solid #f59e0b; padding-left: 10px;';
+    else riskColor = 'border-left: 4px solid #10b981; padding-left: 10px;';
+    
+    return `<li style="${riskColor}">
+      <div style="flex: 0 0 80px;"><strong>C00${item.id}</strong></div>
+      <div style="flex: 1;"><strong>${escapeHtml(item.primary_reason)}</strong><small>${formatDate(item.created_at)}</small></div>
+      <span style="flex: 0 0 80px; text-align: right; color: ${risk === 'high' ? '#ef4444' : risk === 'medium' ? '#f59e0b' : '#10b981'}">${(item.probability * 100).toFixed(1)}%</span>
+    </li>`;
+  }).join('') : '<li class="empty-row">No predictions yet. Start your first assessment.</li>';
 }
 
 async function handleSinglePrediction(event) {

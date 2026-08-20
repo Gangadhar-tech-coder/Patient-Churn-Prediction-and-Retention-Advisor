@@ -229,7 +229,33 @@ async function handleCohortUpload(event) {
 
 function renderCohortRows() {
   const query = ($('#record-filter')?.value || '').trim().toLowerCase();
-  const rows = cohortRows.filter((item) => item.record_id.toLowerCase().includes(query) || String(item.patient_id || '').toLowerCase().includes(query));
+  const riskFilter = $('#risk-filter')?.value || '';
+  const ageFilter = $('#age-filter')?.value || '';
+  const genderFilter = $('#gender-filter')?.value || '';
+
+  const rows = cohortRows.filter((item) => {
+    const matchesQuery = item.record_id.toLowerCase().includes(query) || String(item.patient_id || '').toLowerCase().includes(query);
+    
+    let matchesRisk = true;
+    if (riskFilter) {
+      matchesRisk = String(item.risk_level).toLowerCase() === riskFilter.toLowerCase();
+    }
+    
+    let matchesAge = true;
+    if (ageFilter && item.attributes && item.attributes.Age) {
+      const age = Number(item.attributes.Age);
+      if (ageFilter === '<40') matchesAge = age < 40;
+      else if (ageFilter === '40-60') matchesAge = age >= 40 && age <= 60;
+      else if (ageFilter === '>60') matchesAge = age > 60;
+    }
+    
+    let matchesGender = true;
+    if (genderFilter && item.attributes && item.attributes.Gender) {
+      matchesGender = String(item.attributes.Gender).toLowerCase() === genderFilter.toLowerCase();
+    }
+    
+    return matchesQuery && matchesRisk && matchesAge && matchesGender;
+  });
   const body = $('#cohort-table-body');
   const totalPages = Math.ceil(rows.length / COHORT_PAGE_SIZE) || 1;
   cohortPage = Math.min(cohortPage, totalPages);
@@ -315,7 +341,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (page === 'dashboard') await loadDashboard();
     if (page === 'predict') { loadSelectedPatient(); $('#predict-form')?.addEventListener('submit', handleSinglePrediction); }
     if (page === 'cohort') { restoreCohortResults(); $('#cohort-file')?.addEventListener('change', handleCohortUpload); }
-    if (page === 'cohort') { $('#record-filter')?.addEventListener('input', () => { cohortPage = 1; renderCohortRows(); }); $('#cohort-prev')?.addEventListener('click', () => { cohortPage--; renderCohortRows(); }); $('#cohort-next')?.addEventListener('click', () => { cohortPage++; renderCohortRows(); }); $('#download-cohort')?.addEventListener('click', downloadCohortResults); }
+    if (page === 'cohort') { 
+      const resetAndRender = () => { cohortPage = 1; renderCohortRows(); };
+      $('#record-filter')?.addEventListener('input', resetAndRender); 
+      $('#risk-filter')?.addEventListener('change', resetAndRender);
+      $('#age-filter')?.addEventListener('change', resetAndRender);
+      $('#gender-filter')?.addEventListener('change', resetAndRender);
+      $('#cohort-prev')?.addEventListener('click', () => { cohortPage--; renderCohortRows(); }); 
+      $('#cohort-next')?.addEventListener('click', () => { cohortPage++; renderCohortRows(); }); 
+      $('#download-cohort')?.addEventListener('click', downloadCohortResults); 
+    }
     if (page === 'history') await loadHistory();
     if (page === 'analytics') await loadAnalytics();
   }

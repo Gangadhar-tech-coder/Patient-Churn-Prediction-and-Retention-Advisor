@@ -15,17 +15,33 @@ from sqlalchemy.sql import func
 DB_DIR = os.path.dirname(os.path.abspath(__file__))
 SQLITE_DB_PATH = f"sqlite:///{os.path.join(DB_DIR, 'patient_churn_prediction.db')}"
 
-# Use SQLite database
-DATABASE_URL = os.getenv("DATABASE_URL", SQLITE_DB_PATH)
+def _resolve_database_url() -> str:
+    """
+    Environment-aware DB selection:
+    - Local/dev defaults to SQLite.
+    - Production uses DATABASE_URL when provided.
+    """
+    app_env = (os.getenv("APP_ENV") or os.getenv("ENVIRONMENT") or os.getenv("ENV") or "development").lower()
+    db_url = os.getenv("DATABASE_URL", "").strip()
+
+    # Some hosts expose postgres://, SQLAlchemy expects postgresql://
+    if db_url.startswith("postgres://"):
+        db_url = db_url.replace("postgres://", "postgresql://", 1)
+
+    if app_env == "production" and db_url:
+        return db_url
+    return SQLITE_DB_PATH
+
+
+DATABASE_URL = _resolve_database_url()
 
 engine = create_engine(
-    DATABASE_URL if DATABASE_URL.startswith("sqlite") else SQLITE_DB_PATH,
-    connect_args={"check_same_thread": False} if "sqlite" in (DATABASE_URL or SQLITE_DB_PATH) else {}
+    DATABASE_URL,
+    connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
-
 
 class User(Base):
     __tablename__ = "users"

@@ -8,7 +8,6 @@ Trains:
 
 Saves artifacts to backend/ml_model/
 """
-
 import os
 import joblib
 import pandas as pd
@@ -137,7 +136,6 @@ def train():
     joblib.dump(best_thr, os.path.join(ml_model_dir, "best_thr.pkl"))
 
     print(f"\n[OK] All XGBoost artifacts successfully saved to: {ml_model_dir}")
-
 
 if __name__ == "__main__":
     train()

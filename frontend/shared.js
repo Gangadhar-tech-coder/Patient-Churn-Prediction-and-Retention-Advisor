@@ -178,7 +178,40 @@ async function loadDashboard() {
   const history = (await historyResponse.json()).history.slice(0, 5);
   const list = $('#recent-history');
   if (!list) return;
-  list.innerHTML = history.length ? history.map((item) => `<li><div><strong>${escapeHtml(item.primary_reason)}</strong><small>${formatDate(item.created_at)}</small></div><span>${(item.probability * 100).toFixed(1)}%</span></li>`).join('') : '<li class="empty-row">No predictions yet. Start your first assessment.</li>';
+  const headerHtml = `<li class="history-header" style="border-bottom: 2px solid #E2E8F0; padding-bottom: 8px; margin-bottom: 8px; align-items: flex-end;">
+    <div style="flex: 0 0 80px;"><small>Patient ID</small></div>
+    <div style="flex: 1;"><small>Reason to leave</small></div>
+    <div style="flex: 0 0 80px; text-align: right;"><small>Churn rate</small></div>
+    <div style="flex: 0 0 70px; text-align: right;"><small>Patient</small></div>
+  </li>`;
+  list.innerHTML = history.length ? headerHtml + history.map((item, index) => {
+    let riskColor = '';
+    const risk = String(item.risk_level).toLowerCase();
+    if (risk === 'high') riskColor = 'border-left: 4px solid #ef4444; padding-left: 10px;';
+    else if (risk === 'medium') riskColor = 'border-left: 4px solid #f59e0b; padding-left: 10px;';
+    else riskColor = 'border-left: 4px solid #10b981; padding-left: 10px;';
+    
+    return `<li style="${riskColor}">
+      <div style="flex: 0 0 80px;"><strong>C00${item.id}</strong></div>
+      <div style="flex: 1;"><strong>${escapeHtml(item.primary_reason)}</strong><small>${formatDate(item.created_at)}</small></div>
+      <span style="flex: 0 0 80px; text-align: right; color: ${risk === 'high' ? '#ef4444' : risk === 'medium' ? '#f59e0b' : '#10b981'}">${(item.probability * 100).toFixed(1)}%</span>
+      <div style="flex: 0 0 70px; text-align: right;">
+        <button class="button button-secondary patient-view-button history-view-btn" type="button" data-history-index="${index}" style="padding: 4px 10px; font-size: 11px;">View</button>
+      </div>
+    </li>`;
+  }).join('') : '<li class="empty-row">No predictions yet. Start your first assessment.</li>';
+
+  list.querySelectorAll('.history-view-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const idx = parseInt(e.currentTarget.dataset.historyIndex, 10);
+      const item = history[idx];
+      if (item && item.patient_data) {
+        const pData = typeof item.patient_data === 'string' ? JSON.parse(item.patient_data) : item.patient_data;
+        localStorage.setItem('patient_churn_selected_patient', JSON.stringify({ attributes: pData }));
+        window.location.href = 'predict.html';
+      }
+    });
+  });
 }
 
 async function handleSinglePrediction(event) {
@@ -197,7 +230,8 @@ async function handleSinglePrediction(event) {
     const response = await api('/api/predict', { method: 'POST', body: JSON.stringify(payload) });
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || 'Assessment failed');
-    result.classList.remove('hidden');
+    result.classList.remove('hidden', 'high-risk-result', 'medium-risk-result', 'low-risk-result');
+    result.classList.add(`${String(data.risk_level).toLowerCase()}-risk-result`);
     result.innerHTML = `<div class="result-head"><div><span class="eyebrow">ASSESSMENT COMPLETE</span><h2>${data.percentage}% churn probability</h2></div>${riskBadge(data.risk_level)}</div><div class="result-reason"><span>Primary churn reason</span><strong>${escapeHtml(data.primary_churn_reason)}</strong></div><div class="result-advice"><span>Retention advice</span><p>${escapeHtml(data.retention_advice)}</p></div>`;
     result.scrollIntoView({ behavior: 'smooth', block: 'start' });
   } catch (requestError) {
@@ -229,13 +263,48 @@ async function handleCohortUpload(event) {
 
 function renderCohortRows() {
   const query = ($('#record-filter')?.value || '').trim().toLowerCase();
-  const rows = cohortRows.filter((item) => item.record_id.toLowerCase().includes(query) || String(item.patient_id || '').toLowerCase().includes(query));
+  const riskFilter = $('#risk-filter')?.value || '';
+  const ageFilter = $('#age-filter')?.value || '';
+  const genderFilter = $('#gender-filter')?.value || '';
+
+  const rows = cohortRows.filter((item) => {
+    const matchesQuery = item.record_id.toLowerCase().includes(query) || String(item.patient_id || '').toLowerCase().includes(query);
+    
+    let matchesRisk = true;
+    if (riskFilter) {
+      matchesRisk = String(item.risk_level).toLowerCase() === riskFilter.toLowerCase();
+    }
+    
+    let matchesAge = true;
+    if (ageFilter && item.attributes && item.attributes.Age) {
+      const age = Number(item.attributes.Age);
+      if (ageFilter === '<40') matchesAge = age < 40;
+      else if (ageFilter === '40-60') matchesAge = age >= 40 && age <= 60;
+      else if (ageFilter === '>60') matchesAge = age > 60;
+    }
+    
+    let matchesGender = true;
+    if (genderFilter && item.attributes && item.attributes.Gender) {
+      matchesGender = String(item.attributes.Gender).toLowerCase() === genderFilter.toLowerCase();
+    }
+    
+    return matchesQuery && matchesRisk && matchesAge && matchesGender;
+  });
   const body = $('#cohort-table-body');
   const totalPages = Math.ceil(rows.length / COHORT_PAGE_SIZE) || 1;
   cohortPage = Math.min(cohortPage, totalPages);
   const pageRows = rows.slice((cohortPage - 1) * COHORT_PAGE_SIZE, cohortPage * COHORT_PAGE_SIZE);
   if (!rows.length) body.innerHTML = '<tr><td colspan="7" class="empty-row">No records match this filter.</td></tr>';
-  else body.innerHTML = pageRows.map((item) => `<tr><td><strong>${escapeHtml(item.record_id)}</strong></td><td>${escapeHtml(item.patient_id)}</td><td>${item.percentage}%</td><td>${riskBadge(item.risk_level)}</td><td>${escapeHtml(item.primary_churn_reason)}</td><td>${escapeHtml(item.retention_advice)}</td><td><button class="button button-secondary patient-view-button" type="button" data-patient-id="${escapeHtml(item.patient_id)}">View</button></td></tr>`).join('');
+  else body.innerHTML = pageRows.map((item) => {
+    let rowStyle = '';
+    const risk = String(item.risk_level).toLowerCase();
+    if (risk === 'high') {
+      rowStyle = 'style="background-color: rgba(254, 226, 226, 0.6);"'; // Light red
+    } else if (risk === 'medium') {
+      rowStyle = 'style="background-color: rgba(254, 249, 195, 0.6);"'; // Light yellow
+    }
+    return `<tr ${rowStyle}><td><strong>${escapeHtml(item.record_id)}</strong></td><td>${escapeHtml(item.patient_id)}</td><td>${item.percentage}%</td><td>${riskBadge(item.risk_level)}</td><td>${escapeHtml(item.primary_churn_reason)}</td><td>${escapeHtml(item.retention_advice)}</td><td><button class="button button-secondary patient-view-button" type="button" data-patient-id="${escapeHtml(item.patient_id)}">View</button></td></tr>`;
+  }).join('');
   body.querySelectorAll('[data-patient-id]').forEach((button) => button.addEventListener('click', () => openPatientFromCohort(button.dataset.patientId)));
   const pagination = $('#cohort-pagination');
   if (pagination) {
@@ -260,9 +329,13 @@ function loadSelectedPatient() {
     const attributes = patient.attributes || {};
     const fieldMap = { age: 'Age', gender: 'Gender', state: 'State', specialty: 'Specialty', insurance_type: 'Insurance_Type', tenure_months: 'Tenure_Months', referrals_made: 'Referrals_Made', visits_last_year: 'Visits_Last_Year', missed_appointments: 'Missed_Appointments', days_since_last_visit: 'Days_Since_Last_Visit', overall_satisfaction: 'Overall_Satisfaction', wait_time_satisfaction: 'Wait_Time_Satisfaction', staff_satisfaction: 'Staff_Satisfaction', provider_rating: 'Provider_Rating', avg_out_of_pocket_cost: 'Avg_Out_Of_Pocket_Cost', billing_issues: 'Billing_Issues', portal_usage: 'Portal_Usage', distance_to_facility: 'Distance_To_Facility_Miles' };
     Object.entries(fieldMap).forEach(([field, column]) => {
-      if (attributes[column] !== undefined) {
-        const input = document.querySelector(`[name="${field}"]`);
-        if (input) input.value = attributes[column];
+      const input = document.querySelector(`[name="${field}"]`);
+      if (input) {
+        if (attributes[column] !== undefined) {
+          input.value = attributes[column];
+        } else if (attributes[field] !== undefined) {
+          input.value = attributes[field];
+        }
       }
     });
     localStorage.removeItem('patient_churn_selected_patient');
@@ -284,8 +357,13 @@ async function loadHistory() {
   if (!response.ok) return;
   const records = (await response.json()).history;
   const body = $('#history-body');
-  if (!records.length) { body.innerHTML = '<tr><td colspan="5" class="empty-row">No prediction history yet.</td></tr>'; return; }
-  body.innerHTML = records.map((item) => `<tr><td>${formatDate(item.created_at)}</td><td>${(item.probability * 100).toFixed(1)}%</td><td>${riskBadge(item.risk_level)}</td><td>${escapeHtml(item.primary_reason)}</td><td>${escapeHtml(item.retention_advice)}</td></tr>`).join('');
+  if (!records.length) { body.innerHTML = '<tr><td colspan="8" class="empty-row">No prediction history yet.</td></tr>'; return; }
+  body.innerHTML = records.map((item) => {
+    const pData = typeof item.patient_data === 'string' ? JSON.parse(item.patient_data) : (item.patient_data || {});
+    const gender = pData.gender || pData.Gender || 'N/A';
+    const age = pData.age || pData.Age || 'N/A';
+    return `<tr><td>${formatDate(item.created_at)}</td><td><strong>C00${item.id}</strong></td><td>${escapeHtml(gender)}</td><td>${escapeHtml(String(age))}</td><td>${(item.probability * 100).toFixed(1)}%</td><td>${riskBadge(item.risk_level)}</td><td>${escapeHtml(item.primary_reason)}</td><td>${escapeHtml(item.retention_advice)}</td></tr>`;
+  }).join('');
 }
 
 async function loadAnalytics() {
@@ -315,7 +393,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (page === 'dashboard') await loadDashboard();
     if (page === 'predict') { loadSelectedPatient(); $('#predict-form')?.addEventListener('submit', handleSinglePrediction); }
     if (page === 'cohort') { restoreCohortResults(); $('#cohort-file')?.addEventListener('change', handleCohortUpload); }
-    if (page === 'cohort') { $('#record-filter')?.addEventListener('input', () => { cohortPage = 1; renderCohortRows(); }); $('#cohort-prev')?.addEventListener('click', () => { cohortPage--; renderCohortRows(); }); $('#cohort-next')?.addEventListener('click', () => { cohortPage++; renderCohortRows(); }); $('#download-cohort')?.addEventListener('click', downloadCohortResults); }
+    if (page === 'cohort') { 
+      const resetAndRender = () => { cohortPage = 1; renderCohortRows(); };
+      $('#record-filter')?.addEventListener('input', resetAndRender); 
+      $('#risk-filter')?.addEventListener('change', resetAndRender);
+      $('#age-filter')?.addEventListener('change', resetAndRender);
+      $('#gender-filter')?.addEventListener('change', resetAndRender);
+      $('#cohort-prev')?.addEventListener('click', () => { cohortPage--; renderCohortRows(); }); 
+      $('#cohort-next')?.addEventListener('click', () => { cohortPage++; renderCohortRows(); }); 
+      $('#download-cohort')?.addEventListener('click', downloadCohortResults); 
+    }
     if (page === 'history') await loadHistory();
     if (page === 'analytics') await loadAnalytics();
   }

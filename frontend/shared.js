@@ -1,6 +1,7 @@
 const API_BASE = '';
 const TOKEN_KEY = 'patient_churn_token';
 const COHORT_STORAGE_KEY = 'patient_churn_cohort_results';
+const LEGACY_COHORT_STORAGE_KEY = COHORT_STORAGE_KEY;
 
 const api = (path, options = {}) => fetch(`${API_BASE}${path}`, {
   ...options,
@@ -16,19 +17,28 @@ const $ = (selector) => document.querySelector(selector);
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
 let cohortRows = [];
 let cohortPage = 1;
+let currentUserId = null;
 const COHORT_PAGE_SIZE = 50;
 
+function getCohortStorageKey() {
+  return currentUserId ? `${COHORT_STORAGE_KEY}:${currentUserId}` : null;
+}
+
 function persistCohortResults(stats) {
+  const storageKey = getCohortStorageKey();
+  if (!storageKey) return;
   try {
-    localStorage.setItem(COHORT_STORAGE_KEY, JSON.stringify({ rows: cohortRows, stats }));
+    localStorage.setItem(storageKey, JSON.stringify({ rows: cohortRows, stats }));
   } catch (error) {
     console.warn('Cohort results could not be saved locally.', error);
   }
 }
 
 function restoreCohortResults() {
+  const storageKey = getCohortStorageKey();
+  if (!storageKey) return false;
   try {
-    const stored = localStorage.getItem(COHORT_STORAGE_KEY);
+    const stored = localStorage.getItem(storageKey);
     if (!stored) return false;
     const saved = JSON.parse(stored);
     if (!Array.isArray(saved.rows) || !saved.rows.length || !saved.stats) return false;
@@ -42,7 +52,7 @@ function restoreCohortResults() {
     renderCohortRows();
     return true;
   } catch (error) {
-    localStorage.removeItem(COHORT_STORAGE_KEY);
+    localStorage.removeItem(storageKey);
     return false;
   }
 }
@@ -81,6 +91,9 @@ async function requireAuth() {
     const response = await api('/api/auth/me');
     if (!response.ok) throw new Error('Session expired');
     const data = await response.json();
+    currentUserId = data.user.id;
+    // Remove results saved by older versions under a shared browser key.
+    localStorage.removeItem(LEGACY_COHORT_STORAGE_KEY);
     document.querySelectorAll('[data-user-name]').forEach((node) => { node.textContent = data.user.name; });
     document.querySelectorAll('[data-user-email]').forEach((node) => { node.textContent = data.user.email; });
     document.querySelectorAll('[data-user-initial]').forEach((node) => { node.textContent = data.user.name.charAt(0).toUpperCase(); });
@@ -95,6 +108,7 @@ async function requireAuth() {
 async function signout() {
   try { await api('/api/auth/signout', { method: 'POST' }); } catch (error) { /* local session is still cleared */ }
   localStorage.removeItem(TOKEN_KEY);
+  currentUserId = null;
   redirectToLogin();
 }
 

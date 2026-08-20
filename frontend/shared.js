@@ -182,8 +182,9 @@ async function loadDashboard() {
     <div style="flex: 0 0 80px;"><small>Patient ID</small></div>
     <div style="flex: 1;"><small>Reason to leave</small></div>
     <div style="flex: 0 0 80px; text-align: right;"><small>Churn rate</small></div>
+    <div style="flex: 0 0 70px; text-align: right;"><small>Patient</small></div>
   </li>`;
-  list.innerHTML = history.length ? headerHtml + history.map((item) => {
+  list.innerHTML = history.length ? headerHtml + history.map((item, index) => {
     let riskColor = '';
     const risk = String(item.risk_level).toLowerCase();
     if (risk === 'high') riskColor = 'border-left: 4px solid #ef4444; padding-left: 10px;';
@@ -194,8 +195,23 @@ async function loadDashboard() {
       <div style="flex: 0 0 80px;"><strong>C00${item.id}</strong></div>
       <div style="flex: 1;"><strong>${escapeHtml(item.primary_reason)}</strong><small>${formatDate(item.created_at)}</small></div>
       <span style="flex: 0 0 80px; text-align: right; color: ${risk === 'high' ? '#ef4444' : risk === 'medium' ? '#f59e0b' : '#10b981'}">${(item.probability * 100).toFixed(1)}%</span>
+      <div style="flex: 0 0 70px; text-align: right;">
+        <button class="button button-secondary patient-view-button history-view-btn" type="button" data-history-index="${index}" style="padding: 4px 10px; font-size: 11px;">View</button>
+      </div>
     </li>`;
   }).join('') : '<li class="empty-row">No predictions yet. Start your first assessment.</li>';
+
+  list.querySelectorAll('.history-view-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const idx = parseInt(e.currentTarget.dataset.historyIndex, 10);
+      const item = history[idx];
+      if (item && item.patient_data) {
+        const pData = typeof item.patient_data === 'string' ? JSON.parse(item.patient_data) : item.patient_data;
+        localStorage.setItem('patient_churn_selected_patient', JSON.stringify({ attributes: pData }));
+        window.location.href = 'predict.html';
+      }
+    });
+  });
 }
 
 async function handleSinglePrediction(event) {
@@ -313,9 +329,13 @@ function loadSelectedPatient() {
     const attributes = patient.attributes || {};
     const fieldMap = { age: 'Age', gender: 'Gender', state: 'State', specialty: 'Specialty', insurance_type: 'Insurance_Type', tenure_months: 'Tenure_Months', referrals_made: 'Referrals_Made', visits_last_year: 'Visits_Last_Year', missed_appointments: 'Missed_Appointments', days_since_last_visit: 'Days_Since_Last_Visit', overall_satisfaction: 'Overall_Satisfaction', wait_time_satisfaction: 'Wait_Time_Satisfaction', staff_satisfaction: 'Staff_Satisfaction', provider_rating: 'Provider_Rating', avg_out_of_pocket_cost: 'Avg_Out_Of_Pocket_Cost', billing_issues: 'Billing_Issues', portal_usage: 'Portal_Usage', distance_to_facility: 'Distance_To_Facility_Miles' };
     Object.entries(fieldMap).forEach(([field, column]) => {
-      if (attributes[column] !== undefined) {
-        const input = document.querySelector(`[name="${field}"]`);
-        if (input) input.value = attributes[column];
+      const input = document.querySelector(`[name="${field}"]`);
+      if (input) {
+        if (attributes[column] !== undefined) {
+          input.value = attributes[column];
+        } else if (attributes[field] !== undefined) {
+          input.value = attributes[field];
+        }
       }
     });
     localStorage.removeItem('patient_churn_selected_patient');

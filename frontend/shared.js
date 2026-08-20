@@ -232,7 +232,17 @@ async function handleSinglePrediction(event) {
     if (!response.ok) throw new Error(data.detail || 'Assessment failed');
     result.classList.remove('hidden', 'high-risk-result', 'medium-risk-result', 'low-risk-result');
     result.classList.add(`${String(data.risk_level).toLowerCase()}-risk-result`);
-    result.innerHTML = `<div class="result-head"><div><span class="eyebrow">ASSESSMENT COMPLETE</span><h2>${data.percentage}% churn probability</h2></div>${riskBadge(data.risk_level)}</div><div class="result-reason"><span>Primary churn reason</span><strong>${escapeHtml(data.primary_churn_reason)}</strong></div><div class="result-advice"><span>Retention advice</span><p>${escapeHtml(data.retention_advice)}</p></div>`;
+    
+    let shapHtml = '';
+    if (data.feature_contributions && data.feature_contributions.length > 0) {
+      shapHtml = '<div class="result-shap" style="margin-top: 16px; padding: 18px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f8fafc;">' +
+        '<span style="color: var(--slate); font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;">Key Risk Drivers (SHAP)</span>' +
+        '<ul style="margin: 8px 0 0; padding-left: 20px; color: var(--slate); font-size: 14px; line-height: 1.7;">' +
+        data.feature_contributions.map(fc => `<li><strong>${escapeHtml(fc.factor)}</strong>: impact ${fc.risk_impact > 0 ? '+' : ''}${fc.risk_impact.toFixed(4)}</li>`).join('') +
+        '</ul></div>';
+    }
+
+    result.innerHTML = `<div class="result-head"><div><span class="eyebrow">ASSESSMENT COMPLETE</span><h2>${data.percentage}% churn probability</h2></div>${riskBadge(data.risk_level)}</div><div class="result-reason"><span>Primary churn reason</span><strong>${escapeHtml(data.primary_churn_reason)}</strong></div><div class="result-advice"><span>Retention advice</span><p>${escapeHtml(data.retention_advice)}</p></div>` + shapHtml;
     result.scrollIntoView({ behavior: 'smooth', block: 'start' });
   } catch (requestError) {
     if (error) { error.textContent = requestError.message; error.classList.remove('hidden'); }

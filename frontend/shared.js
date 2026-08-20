@@ -357,8 +357,13 @@ async function loadHistory() {
   if (!response.ok) return;
   const records = (await response.json()).history;
   const body = $('#history-body');
-  if (!records.length) { body.innerHTML = '<tr><td colspan="5" class="empty-row">No prediction history yet.</td></tr>'; return; }
-  body.innerHTML = records.map((item) => `<tr><td>${formatDate(item.created_at)}</td><td>${(item.probability * 100).toFixed(1)}%</td><td>${riskBadge(item.risk_level)}</td><td>${escapeHtml(item.primary_reason)}</td><td>${escapeHtml(item.retention_advice)}</td></tr>`).join('');
+  if (!records.length) { body.innerHTML = '<tr><td colspan="8" class="empty-row">No prediction history yet.</td></tr>'; return; }
+  body.innerHTML = records.map((item) => {
+    const pData = typeof item.patient_data === 'string' ? JSON.parse(item.patient_data) : (item.patient_data || {});
+    const gender = pData.gender || pData.Gender || 'N/A';
+    const age = pData.age || pData.Age || 'N/A';
+    return `<tr><td>${formatDate(item.created_at)}</td><td><strong>C00${item.id}</strong></td><td>${escapeHtml(gender)}</td><td>${escapeHtml(String(age))}</td><td>${(item.probability * 100).toFixed(1)}%</td><td>${riskBadge(item.risk_level)}</td><td>${escapeHtml(item.primary_reason)}</td><td>${escapeHtml(item.retention_advice)}</td></tr>`;
+  }).join('');
 }
 
 async function loadAnalytics() {

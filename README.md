@@ -104,27 +104,13 @@ flowchart TD
 
 ---
 
-## 🔬 Machine Learning Pipeline & Benchmarking
+## 🔬 Machine Learning Pipeline
 
 ### Feature Engineering
 The model extracts high-leverage predictive signals through custom Domain-Specific Feature Engineering:
 $$\text{Engagement Score} = \text{Visits Last Year} - \text{Missed Appointments}$$
 $$\text{Cost Per Visit} = \frac{\text{Avg Out-Of-Pocket Cost}}{\text{Visits Last Year} + 1}$$
 $$\text{Satisfaction Avg} = \frac{\text{Overall Sat} + \text{Wait Time Sat} + \text{Staff Sat}}{3}$$
-
-### Model Benchmark Comparison
-During development, 8 distinct machine learning algorithms were benchmarked on healthcare retention data:
-
-| Model | ROC-AUC | Accuracy | Precision | Recall | F1-Score | Latency (ms) |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **XGBoost Classifier (Production)** | **0.9942** | **96.50%** | **0.9520** | **0.9680** | **0.9599** | **12.4ms** |
-| **Random Forest Classifier** | 0.9912 | 95.80% | 0.9410 | 0.9590 | 0.9499 | 18.2ms |
-| **Gradient Boosting Classifier** | 0.9885 | 94.90% | 0.9320 | 0.9480 | 0.9399 | 24.1ms |
-| **Extra Trees Classifier** | 0.9850 | 94.20% | 0.9250 | 0.9410 | 0.9329 | 15.6ms |
-| **Logistic Regression** | 0.8920 | 83.50% | 0.8100 | 0.8250 | 0.8174 | 3.1ms |
-| **Support Vector Machine (SVC)** | 0.8870 | 82.10% | 0.7980 | 0.8120 | 0.8049 | 42.5ms |
-
-*Note: The binary classifier threshold is set to **0.37** (recall-focused) to minimize false negatives and ensure vulnerable patients receive early retention outreach.*
 
 ---
 

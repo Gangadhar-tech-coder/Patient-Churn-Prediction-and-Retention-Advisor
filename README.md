@@ -1,5 +1,6 @@
 # 🏥 Patient Churn Prediction & Retention Advisor
 
+[![Live Demo](https://img.shields.io/badge/Live_Demo-Render-46E3B7?style=for-the-badge&logo=render&logoColor=white)](https://patient-churn-prediction-and-retention.onrender.com/)
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![XGBoost](https://img.shields.io/badge/XGBoost-Ensemble-FF6F00?style=for-the-badge&logo=xgboost&logoColor=white)](https://xgboost.readthedocs.io)
@@ -7,6 +8,8 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](LICENSE)
 
 > An end-to-end Machine Learning web application designed for healthcare provider systems to **predict patient churn probability**, **diagnose root-cause disengagement reasons**, and **prescribe actionable retention workflows** in real-time.
+
+🌐 **Live Application Link**: [https://patient-churn-prediction-and-retention.onrender.com/](https://patient-churn-prediction-and-retention.onrender.com/)
 
 ---
 
@@ -130,22 +133,29 @@ During development, 8 distinct machine learning algorithms were benchmarked on h
 - **Backend Gateway**: FastAPI, Uvicorn, Pydantic v2, PyJWT, Passlib (`bcrypt`), SQLite
 - **Machine Learning & Data Science**: XGBoost, Scikit-Learn, Pandas, NumPy, Joblib
 - **Frontend Architecture**: Vanilla JavaScript (ES6+), HTML5, Custom CSS Design System, FontAwesome, Google Fonts (Inter & Playfair Display)
+- **Deployment**: Render Cloud Platform
 
 ---
 
-## ⚡ Quick Start Guide
+## 🌐 Live Demo & Quick Start Guide
 
-### Prerequisites
+### 🚀 Live Deployment
+Explore the live working web application directly without local installation:  
+👉 **[https://patient-churn-prediction-and-retention.onrender.com/](https://patient-churn-prediction-and-retention.onrender.com/)**
+
+### 🛠️ Local Installation
+
+#### Prerequisites
 - Python 3.10 or higher
 - Git
 
-### 1. Clone Repository
+#### 1. Clone Repository
 ```bash
 git clone https://github.com/Gangadhar-tech-coder/Patient-Churn-Prediction-and-Retention-Advisor.git
 cd Patient-Churn-Prediction-and-Retention-Advisor
 ```
 
-### 2. Set Up Virtual Environment & Install Dependencies
+#### 2. Set Up Virtual Environment & Install Dependencies
 ```bash
 cd backend
 python -m venv venv
@@ -159,17 +169,17 @@ venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 3. (Optional) Train / Retrain ML Models
+#### 3. (Optional) Train / Retrain ML Models
 ```bash
 python train_model.py
 ```
 
-### 4. Launch Application Server
+#### 4. Launch Application Server
 ```bash
 python -m uvicorn main:app --reload --port 8000
 ```
 
-Access the application workspace in your browser at:  
+Access the local workspace in your browser at:  
 👉 **`http://localhost:8000`**
 
 ---
@@ -198,6 +208,7 @@ Access the application workspace in your browser at:
 ## 👨‍💻 Author
 
 **Gangadhara Rao Pulicharla**  
+- **Live Application**: [patient-churn-prediction-and-retention.onrender.com](https://patient-churn-prediction-and-retention.onrender.com/)
 - **GitHub**: [@Gangadhar-tech-coder](https://github.com/Gangadhar-tech-coder)  
 - **Project Repository**: [Patient-Churn-Prediction-and-Retention-Advisor](https://github.com/Gangadhar-tech-coder/Patient-Churn-Prediction-and-Retention-Advisor)
 
